@@ -22,6 +22,9 @@ $(MODEL).h: $(MODEL).json
 $(MODEL)-main: $(mkfile_path)/$(MODEL)/$(MODEL)-main.cpp $(MODEL).h $(MODEL).o
 	$(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(mkfile_path)/elfio/ -I. $^ -o $@
 
+asm: $(MODEL).mlir
+	arcilator $< | opt -O3 --strip-debug -S | llc -O3 --filetype=asm -o $(MODEL).s
+
 run: $(MODEL)-main
 	./$(MODEL)-main $(BINARY)
 
