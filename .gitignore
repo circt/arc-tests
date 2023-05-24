@@ -1,0 +1,10 @@
+*.mlir
+*.o
+*.sv
+/*.fir
+*.json
+/*.h
+/riscinator-main
+/riscinator-vtor
+*.vcd
+.verilator

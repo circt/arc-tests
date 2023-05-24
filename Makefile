@@ -25,6 +25,12 @@ $(MODEL)-main: $(mkfile_path)/$(MODEL)/$(MODEL)-main.cpp $(MODEL).h $(MODEL).o
 run: $(MODEL)-main
 	./$(MODEL)-main $(BINARY)
 
+Core.sv: riscinator.fir
+	firtool -o $@ $< --dedup --lowering-options=noAlwaysComb,disallowPackedArrays,disallowLocalVariables
+
+riscinator-vtor: Core.sv
+	verilator --public -sv -cc -Mdir .verilator $< --exe --build riscinator/riscinator-vtor.cpp -o ../$@
+
 clean:
 	rm -f $(MODEL).fir $(MODEL).mlir $(MODEL).h $(MODEL).o $(MODEL).json $(MODEL)-main
 
