@@ -13,6 +13,9 @@
 #include "jmps_mem.h"
 #include "dhrystone_mem.h"
 
+#define MEMSIZE 8192*8
+#define MEMBASE 0x100000
+
 typedef struct {
     uint32_t idx;
     uint32_t value;
@@ -39,15 +42,15 @@ static unsigned addr2idx(uint32_t addr, size_t mem_base) {
 
 static bool finished = false;
 
-static float simulate(Core &model, ValueChangeDump<CoreLayout> vcd, uint32_t* mem, size_t len, size_t mem_base, unsigned max_cycles, bool verbose) {
+static float simulate(Core &model, ValueChangeDump<CoreLayout> *vcd, uint32_t* mem, size_t len, size_t mem_base, unsigned max_cycles, bool verbose) {
     auto &core = model.view;
     float simFrequency = 0;
     core.reset = 1;
-    model.passthrough();
-    vcd.writeTimestep(1);
     model.clock();
     model.passthrough();
-    vcd.writeTimestep(1);
+#ifdef TRACE
+    vcd->writeTimestep(1);
+#endif
     core.reset = 0;
     model.passthrough();
 
@@ -119,7 +122,9 @@ static float simulate(Core &model, ValueChangeDump<CoreLayout> vcd, uint32_t* me
         model.passthrough();
         t1 = std::chrono::high_resolution_clock::now();
         duration += t1 - t0;
-        vcd.writeTimestep(1);
+#ifdef TRACE
+        vcd->writeTimestep(1);
+#endif
 
         auto seconds =
             std::chrono::duration_cast<std::chrono::duration<double>>(duration)
@@ -151,15 +156,16 @@ static bool check_results(Core &model, uint32_t* mem, size_t mem_base, check_t* 
     return false;
 }
 
-#define MEMSIZE 8192*8
-#define MEMBASE 0x100000
-static uint32_t mem[MEMSIZE];
-
 static bool itype() {
     Core core;
+    ValueChangeDump<CoreLayout> *vcd_ptr = nullptr;
+#ifdef TRACE
     std::ofstream os("itype.vcd");
     auto vcd = core.vcd(os);
+    vcd_ptr = &vcd;
+#endif
 
+    uint32_t mem[MEMSIZE];
     memset(mem, 0, sizeof(mem));
     memcpy(mem, itype_bin, itype_bin_len);
     check_t* check = (check_t*) calloc(sizeof(check_t), 1);
@@ -180,15 +186,20 @@ static bool itype() {
         {0x100004, 63},
         {0x100008, 67},
     };
-    simulate(core, vcd, (uint32_t*) itype_bin, MEMSIZE, MEMBASE, 50, false);
-    return check_results(core, (uint32_t*) itype_bin, MEMBASE, check);
+    simulate(core, vcd_ptr, (uint32_t*) mem, MEMSIZE, MEMBASE, 50, false);
+    return check_results(core, (uint32_t*) mem, MEMBASE, check);
 }
 
 static bool jmps() {
     Core core;
+    ValueChangeDump<CoreLayout> *vcd_ptr = nullptr;
+#ifdef TRACE
     std::ofstream os("jmps.vcd");
     auto vcd = core.vcd(os);
+    vcd_ptr = &vcd;
+#endif
 
+    uint32_t mem[MEMSIZE];
     memset(mem, 0, sizeof(mem));
     memcpy(mem, jmps_bin, jmps_bin_len);
     check_t* check = (check_t*) calloc(sizeof(check_t), 1);
@@ -218,20 +229,26 @@ static bool jmps() {
         {0x100004, 63},
         {0x100008, 67},
     };
-    simulate(core, vcd, (uint32_t*) jmps_bin, MEMSIZE, MEMBASE, 50, false);
-    return check_results(core, (uint32_t*) jmps_bin, MEMBASE, check);
+    simulate(core, vcd_ptr, (uint32_t*) mem, MEMSIZE, MEMBASE, 50, false);
+    return check_results(core, (uint32_t*) mem, MEMBASE, check);
 }
 
 static bool dhrystone() {
     Core core;
+    ValueChangeDump<CoreLayout> *vcd_ptr = nullptr;
+#ifdef TRACE
     std::ofstream os("dhrystone.vcd");
-    auto vcd = core.vcd(os);
+    ValueChangeDump<CoreLayout> vcd = core.vcd(os);
+    vcd_ptr = &vcd;
+#endif
 
+    uint32_t mem[MEMSIZE];
     memset(mem, 0, sizeof(mem));
     memcpy(mem, dhrystone_bin, dhrystone_bin_len);
 
     finished = false;
-    printf("%f\n", simulate(core, vcd, (uint32_t*) dhrystone_bin, MEMSIZE, MEMBASE, 10000000, false));
+    auto simFrequency = simulate(core, vcd_ptr, (uint32_t*) mem, MEMSIZE, MEMBASE, 10000000, false);
+    printf("%f\n", simFrequency);
     return !finished;
 }
 
@@ -241,6 +258,9 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Format: riscinator-main (itype|jmps|dhrystone)?\n");
         return 0;
     }
+#ifdef TRACE
+    fprintf(stderr, "Tracing enabled!\n");
+#endif
     if (argc == 1 || !std::strcmp(argv[1], "itype")) {
         fprintf(stderr, "** start simulating itype **\n");
         failed |= itype();

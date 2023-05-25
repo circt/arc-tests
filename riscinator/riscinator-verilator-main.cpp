@@ -16,6 +16,9 @@ double sc_time_stamp() { return 0; }
 #include <verilated_vcd_c.h>
 #include "VCore__Syms.h"
 
+#define MEMSIZE 8192*8
+#define MEMBASE 0x100000
+
 typedef struct {
     uint32_t idx;
     uint32_t value;
@@ -54,7 +57,9 @@ static float simulate(VCore &core, VerilatedVcdC *trace, uint32_t* mem, size_t l
     float simFrequency = 0;
     core.reset = 1;
     clock(core);
+#ifdef TRACE
     trace->dump(cycle);
+#endif
     core.reset = 0;
     core.eval();
 
@@ -127,7 +132,9 @@ static float simulate(VCore &core, VerilatedVcdC *trace, uint32_t* mem, size_t l
         clock(core);
         t1 = std::chrono::high_resolution_clock::now();
         duration += t1 - t0;
+#ifdef TRACE
         trace->dump(cycle);
+#endif
         ++cycle;
 
         auto seconds =
@@ -161,17 +168,16 @@ static bool check_results(VCore &core, uint32_t* mem, size_t mem_base, check_t* 
     return false;
 }
 
-
-#define MEMSIZE 8192*8
-#define MEMBASE 0x100000
-static uint32_t mem[MEMSIZE];
-
 static bool itype() {
-    VerilatedVcdC *trace = new VerilatedVcdC;
+    VerilatedVcdC *trace = nullptr;
     auto dut = std::make_unique<VCore>();
+#ifdef TRACE
+    trace = new VerilatedVcdC;
     dut->trace(trace, 99);
     trace->open("riscinator-itype.vcd");
+#endif
 
+    uint32_t mem[MEMSIZE];
     memset(mem, 0, sizeof(mem));
     memcpy(mem, itype_bin, itype_bin_len);
     check_t* check = (check_t*) calloc(sizeof(check_t), 1);
@@ -192,16 +198,20 @@ static bool itype() {
         {0x100004, 63},
         {0x100008, 67},
     };
-    simulate(*dut.get(), trace, (uint32_t*) itype_bin, MEMSIZE, MEMBASE, 50, false);
+    simulate(*dut.get(), trace, (uint32_t*) mem, MEMSIZE, MEMBASE, 50, false);
     return check_results(*dut.get(), (uint32_t*) itype_bin, MEMBASE, check);
 }
 
 static bool jmps() {
-    VerilatedVcdC *trace = new VerilatedVcdC;
+    VerilatedVcdC *trace = nullptr;
     auto dut = std::make_unique<VCore>();
+#ifdef TRACE
+    trace = new VerilatedVcdC;
     dut->trace(trace, 99);
     trace->open("riscinator-jmps.vcd");
+#endif
 
+    uint32_t mem[MEMSIZE];
     memset(mem, 0, sizeof(mem));
     memcpy(mem, jmps_bin, jmps_bin_len);
     check_t* check = (check_t*) calloc(sizeof(check_t), 1);
@@ -231,33 +241,42 @@ static bool jmps() {
         {0x100004, 63},
         {0x100008, 67},
     };
-    simulate(*dut.get(), trace, (uint32_t*) jmps_bin, MEMSIZE, MEMBASE, 50, false);
+    simulate(*dut.get(), trace, (uint32_t*) mem, MEMSIZE, MEMBASE, 50, false);
     return check_results(*dut.get(), (uint32_t*) jmps_bin, MEMBASE, check);
 }
 
 static bool dhrystone() {
     auto dut = std::make_unique<VCore>();
-    VerilatedVcdC *trace = new VerilatedVcdC;
+    VerilatedVcdC *trace = nullptr;
+#ifdef TRACE
+    trace = new VerilatedVcdC;
     dut->trace(trace, 99);
     trace->open("riscinator-dhrystone.vcd");
+#endif
 
+    uint32_t mem[MEMSIZE];
     memset(mem, 0, sizeof(mem));
     memcpy(mem, dhrystone_bin, dhrystone_bin_len);
 
     finished = false;
-    printf("%f\n", simulate(*dut.get(), trace, (uint32_t*) dhrystone_bin, MEMSIZE, MEMBASE, 10000000, false));
+    printf("%f\n", simulate(*dut.get(), trace, (uint32_t*) mem, MEMSIZE, MEMBASE, 10000000, false));
     return !finished;
 }
 
 int main(int argc, char **argv) {
     Verilated::commandArgs(argc,argv);
     Verilated::debug(0);
+#ifdef TRACE
     Verilated::traceEverOn(true);
+#endif
     bool failed = false;
     if (argc > 2) {
         fprintf(stderr, "Format: riscinator-main (itype|jmps|dhrystone)?\n");
         return 0;
     }
+#ifdef TRACE
+    fprintf(stderr, "Tracing enabled!\n");
+#endif
     if (argc == 1 || !std::strcmp(argv[1], "itype")) {
         fprintf(stderr, "** start simulating itype **\n");
         failed |= itype();
