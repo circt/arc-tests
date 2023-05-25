@@ -1,4 +1,3 @@
-#include "riscinator.h"
 #include <cstdio>
 #include <iostream>
 #include <fstream>
@@ -9,9 +8,13 @@
 #include <vector>
 #include <chrono>
 
+double sc_time_stamp() { return 0; }
+
 #include "itype_mem.h"
 #include "jmps_mem.h"
 #include "dhrystone_mem.h"
+#include <verilated_vcd_c.h>
+#include "VCore__Syms.h"
 
 typedef struct {
     uint32_t idx;
@@ -39,24 +42,30 @@ static unsigned addr2idx(uint32_t addr, size_t mem_base) {
 
 static bool finished = false;
 
-static float simulate(Core &model, ValueChangeDump<CoreLayout> vcd, uint32_t* mem, size_t len, size_t mem_base, unsigned max_cycles, bool verbose) {
-    auto &core = model.view;
+static void clock(VCore &core) {
+    core.clock = 0;
+    core.eval();
+    core.clock = 1;
+    core.eval();
+}
+
+static float simulate(VCore &core, VerilatedVcdC *trace, uint32_t* mem, size_t len, size_t mem_base, unsigned max_cycles, bool verbose) {
+    uint64_t cycle = 0;
     float simFrequency = 0;
     core.reset = 1;
-    model.passthrough();
-    vcd.writeTimestep(1);
-    model.clock();
-    model.passthrough();
-    vcd.writeTimestep(1);
+    clock(core);
+    trace->dump(cycle);
     core.reset = 0;
-    model.passthrough();
+    core.eval();
 
     uint32_t next_imem_rdata = 0;
     uint8_t next_imem_rvalid = 0;
     uint32_t next_dmem_rdata = 0;
     uint8_t next_dmem_rvalid = 0;
 
+    ++cycle;
     auto duration = std::chrono::high_resolution_clock::duration::zero();
+
     for (unsigned i = 0; i < max_cycles; i++) {
         core.io_imem_rvalid = next_imem_rvalid;
         core.io_imem_rdata = next_imem_rdata;
@@ -68,7 +77,7 @@ static float simulate(Core &model, ValueChangeDump<CoreLayout> vcd, uint32_t* me
         core.io_dmem_gnt = core.io_dmem_req;
 
         auto t0 = std::chrono::high_resolution_clock::now();
-        model.passthrough();
+        core.eval();
         auto t1 = std::chrono::high_resolution_clock::now();
         duration += t1 - t0;
 
@@ -115,11 +124,11 @@ static float simulate(Core &model, ValueChangeDump<CoreLayout> vcd, uint32_t* me
         }
 
         t0 = std::chrono::high_resolution_clock::now();
-        model.clock();
-        model.passthrough();
+        clock(core);
         t1 = std::chrono::high_resolution_clock::now();
         duration += t1 - t0;
-        vcd.writeTimestep(1);
+        trace->dump(cycle);
+        ++cycle;
 
         auto seconds =
             std::chrono::duration_cast<std::chrono::duration<double>>(duration)
@@ -128,12 +137,13 @@ static float simulate(Core &model, ValueChangeDump<CoreLayout> vcd, uint32_t* me
         if (i % 10000 == 0 && i != 0)
             std::cerr << "Cycle " << i << " [" << simFrequency << " Hz]\n";
     }
+
     return simFrequency;
 }
-static bool check_results(Core &model, uint32_t* mem, size_t mem_base, check_t* check) {
-    auto &core = model.view;
+
+static bool check_results(VCore &core, uint32_t* mem, size_t mem_base, check_t* check) {
     for (auto v : check->regs) {
-        auto got = core.internal.rf.regs_ext.words[v.idx].data;
+        auto got = core.rootp->Core__DOT__rf__DOT__regs_ext__DOT__Memory[v.idx];
         auto expected = v.value;
         if (got != expected) {
             printf("FAIL: regs[%d]: %d != %d\n", v.idx, got, expected);
@@ -151,14 +161,16 @@ static bool check_results(Core &model, uint32_t* mem, size_t mem_base, check_t* 
     return false;
 }
 
+
 #define MEMSIZE 8192*8
 #define MEMBASE 0x100000
 static uint32_t mem[MEMSIZE];
 
 static bool itype() {
-    Core core;
-    std::ofstream os("itype.vcd");
-    auto vcd = core.vcd(os);
+    VerilatedVcdC *trace = new VerilatedVcdC;
+    auto dut = std::make_unique<VCore>();
+    dut->trace(trace, 99);
+    trace->open("riscinator-itype.vcd");
 
     memset(mem, 0, sizeof(mem));
     memcpy(mem, itype_bin, itype_bin_len);
@@ -180,14 +192,15 @@ static bool itype() {
         {0x100004, 63},
         {0x100008, 67},
     };
-    simulate(core, vcd, (uint32_t*) itype_bin, MEMSIZE, MEMBASE, 50, false);
-    return check_results(core, (uint32_t*) itype_bin, MEMBASE, check);
+    simulate(*dut.get(), trace, (uint32_t*) itype_bin, MEMSIZE, MEMBASE, 50, false);
+    return check_results(*dut.get(), (uint32_t*) itype_bin, MEMBASE, check);
 }
 
 static bool jmps() {
-    Core core;
-    std::ofstream os("jmps.vcd");
-    auto vcd = core.vcd(os);
+    VerilatedVcdC *trace = new VerilatedVcdC;
+    auto dut = std::make_unique<VCore>();
+    dut->trace(trace, 99);
+    trace->open("riscinator-jmps.vcd");
 
     memset(mem, 0, sizeof(mem));
     memcpy(mem, jmps_bin, jmps_bin_len);
@@ -218,24 +231,28 @@ static bool jmps() {
         {0x100004, 63},
         {0x100008, 67},
     };
-    simulate(core, vcd, (uint32_t*) jmps_bin, MEMSIZE, MEMBASE, 50, false);
-    return check_results(core, (uint32_t*) jmps_bin, MEMBASE, check);
+    simulate(*dut.get(), trace, (uint32_t*) jmps_bin, MEMSIZE, MEMBASE, 50, false);
+    return check_results(*dut.get(), (uint32_t*) jmps_bin, MEMBASE, check);
 }
 
 static bool dhrystone() {
-    Core core;
-    std::ofstream os("dhrystone.vcd");
-    auto vcd = core.vcd(os);
+    auto dut = std::make_unique<VCore>();
+    VerilatedVcdC *trace = new VerilatedVcdC;
+    dut->trace(trace, 99);
+    trace->open("riscinator-dhrystone.vcd");
 
     memset(mem, 0, sizeof(mem));
     memcpy(mem, dhrystone_bin, dhrystone_bin_len);
 
     finished = false;
-    printf("%f\n", simulate(core, vcd, (uint32_t*) dhrystone_bin, MEMSIZE, MEMBASE, 10000000, false));
+    printf("%f\n", simulate(*dut.get(), trace, (uint32_t*) dhrystone_bin, MEMSIZE, MEMBASE, 10000000, false));
     return !finished;
 }
 
 int main(int argc, char **argv) {
+    Verilated::commandArgs(argc,argv);
+    Verilated::debug(0);
+    Verilated::traceEverOn(true);
     bool failed = false;
     if (argc > 2) {
         fprintf(stderr, "Format: riscinator-main (itype|jmps|dhrystone)?\n");
@@ -252,7 +269,7 @@ int main(int argc, char **argv) {
     if (argc == 1 || !std::strcmp(argv[1], "dhrystone")) {
         fprintf(stderr, "** start simulating dhrystone **\n");
         for (int i = 0; i < 10; ++i)
-          failed |= dhrystone();
+            failed |= dhrystone();
     }
 
     if (failed) return 1;
