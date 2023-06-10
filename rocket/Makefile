@@ -14,7 +14,7 @@ $(shell mkdir -p $(BUILD_DIR))
 SOURCE_MODEL ?= $(SOURCE_DIR)/rocket
 BUILD_MODEL ?= $(BUILD_DIR)/rocket
 
-ARCILATOR_ARGS ?= --mlir-timing
+ARCILATOR_ARGS ?= --mlir-timing --print-debug-info
 VERILATOR_ARGS ?= -DPRINTF_COND=0
 
 TRACE ?= 1
@@ -43,7 +43,7 @@ $(BUILD_MODEL).mlir: $(BUILD_MODEL).fir
 
 $(BUILD_MODEL)-arc.o $(BUILD_MODEL).json: $(BUILD_MODEL).mlir
 	arcilator $< --state-file=$(BUILD_MODEL).json -o $(BUILD_MODEL)-arc.ll $(ARCILATOR_ARGS)
-	opt -O3 --strip-debug -S $(BUILD_MODEL)-arc.ll | llc -O3 --filetype=obj -o $(BUILD_MODEL)-arc.o
+	opt -O3 -S $(BUILD_MODEL)-arc.ll | llc -O3 --filetype=obj -o $(BUILD_MODEL)-arc.o
 	objdump -d $(BUILD_MODEL)-arc.o > $(BUILD_MODEL)-arc.s
 
 $(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
