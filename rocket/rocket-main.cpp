@@ -274,9 +274,9 @@ int main(int argc, char **argv) {
 
   // Allocate the simulation models.
   ComparingRocketModel model;
-  if (optRunAll or optRunVtor)
+  if (optRunAll || optRunVtor)
     model.models.push_back(makeVerilatorModel());
-  if (optRunAll or optRunArcs)
+  if (optRunAll || optRunArcs)
     model.models.push_back(makeArcilatorModel());
   if (optVcdOutputFile)
     model.vcd_start(optVcdOutputFile);
