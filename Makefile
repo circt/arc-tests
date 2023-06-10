@@ -58,4 +58,7 @@ verilate: $(MODEL)-verilator-main
 clean:
 	rm -rf $(MODEL).fir $(MODEL).mlir $(MODEL).h $(MODEL).o $(MODEL).json $(MODEL)-main $(MODEL).sv $(MODEL)-vtor $(MODEL)-verilator-main
 
+run-rocket:
+	$(MAKE) -C $(mkfile_path)/rocket run
+
 .PHONY: clean run

@@ -1,35 +1,197 @@
-#include "rocket.h"
 #include "elfio/elfio.hpp"
+#include "rocket-model.h"
 #include <cassert>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <iostream>
 #include <map>
 
-extern "C" {
-void DigitalTop_clock(void *state);
-void DigitalTop_clock_0(void *state);
-void DigitalTop_clock_1(void *state);
-void DigitalTop_clock_2(void *state);
-void DigitalTop_clock_3(void *state);
-void DigitalTop_clock_4(void *state);
-void DigitalTop_clock_5(void *state);
-void DigitalTop_clock_6(void *state);
-void DigitalTop_clock_7(void *state);
-void DigitalTop_clock_8(void *state);
+RocketModel::~RocketModel() {}
+
+class ComparingRocketModel : public RocketModel {
+public:
+  std::vector<std::unique_ptr<RocketModel>> models;
+  size_t cycle = 0;
+  size_t num_mismatches = 0;
+
+  virtual ~ComparingRocketModel() {
+    std::cerr << "----------------------------------------\n";
+    std::cerr << cycle << " cycles total\n";
+    for (auto &model : models) {
+      auto seconds = std::chrono::duration_cast<std::chrono::duration<double>>(
+                         model->duration)
+                         .count();
+      std::cerr << model->name << ": " << (cycle / seconds) << " Hz\n";
+    }
+  }
+
+  void vcd_start(const char *outputFile) override {
+    for (auto &model : models) {
+      std::string extendedFile{outputFile};
+      auto pos = extendedFile.rfind('.');
+      extendedFile.insert(pos, model->name);
+      extendedFile.insert(pos, "-");
+      model->vcd_start(extendedFile.data());
+    }
+  }
+
+  void vcd_dump(size_t cycle) override {
+    for (auto &model : models)
+      model->vcd_dump(cycle);
+  }
+
+  void clock() override {
+    compare_ports();
+    for (auto &model : models) {
+      model->vcd_dump(cycle);
+      auto t_before = std::chrono::high_resolution_clock::now();
+      model->clock();
+      auto t_after = std::chrono::high_resolution_clock::now();
+      model->duration += t_after - t_before;
+    }
+    ++cycle;
+  }
+
+  void passthrough() override {
+    for (auto &model : models)
+      model->passthrough();
+  }
+
+  void set_reset(bool reset) override {
+    for (auto &model : models)
+      model->set_reset(reset);
+  }
+
+  void set_mem(AxiInputs &in) override {
+    for (auto &model : models)
+      model->set_mem(in);
+  }
+
+  AxiOutputs get_mem() override {
+    if (models.empty())
+      return {};
+    return models[0]->get_mem();
+  }
+
+  void compare_ports() {
+    if (models.size() < 2)
+      return;
+    auto portsA = models[0]->get_ports();
+    for (unsigned modelIdx = 1; modelIdx < models.size(); ++modelIdx) {
+      auto portsB = models[modelIdx]->get_ports();
+      for (unsigned portIdx = 0; portIdx < portsA.size(); ++portIdx) {
+        if (portsA[portIdx] == portsB[portIdx])
+          continue;
+        ++num_mismatches;
+        std::cerr << "cycle " << cycle << ": mismatching " << std::hex
+                  << PORT_NAMES[portIdx] << ": " << portsA[portIdx] << " ("
+                  << models[0]->name << ") != " << portsB[portIdx] << " ("
+                  << models[modelIdx]->name << ")\n"
+                  << std::dec;
+      }
+    }
+  }
+};
+
+struct AxiPort {
+  enum {
+    RESP_OKAY = 0b00,
+    RESP_EXOKAY = 0b01,
+    RESP_SLVERR = 0b10,
+    RESP_DECERR = 0b11
+  };
+
+  AxiInputs in;
+  AxiOutputs out;
+
+  void update_a();
+  void update_b();
+
+  std::function<void(size_t addr, size_t &data)> readFn;
+  std::function<void(size_t addr, size_t data, size_t mask)> writeFn;
+
+private:
+  unsigned read_beats_left = 0;
+  size_t read_id;
+  size_t read_addr;
+  size_t read_size; // log2
+  unsigned write_beats_left = 0;
+  size_t write_id;
+  size_t write_addr;
+  size_t write_size; // log2
+  bool write_acked = true;
+};
+
+void AxiPort::update_a() {
+  // Present read data.
+  in.r_valid = false;
+  in.r_id = 0;
+  in.r_data = 0;
+  in.r_resp = RESP_OKAY;
+  in.r_last = false;
+  if (read_beats_left > 0) {
+    in.r_valid = true;
+    in.r_id = read_id;
+    if (readFn)
+      readFn(read_addr, in.r_data);
+    else
+      in.r_data = 0x1050007310500073; // wfi
+    in.r_last = read_beats_left == 1;
+  }
+
+  // Present write acknowledge.
+  in.b_valid = false;
+  in.b_id = 0;
+  in.b_resp = RESP_OKAY;
+  if (write_beats_left == 0 && !write_acked) {
+    in.b_valid = true;
+    in.b_id = write_id;
+  }
+
+  // Handle write data.
+  in.w_ready = write_beats_left > 0;
+  if (out.w_valid && in.w_ready) {
+    if (writeFn) {
+      size_t strb = out.w_strb;
+      strb &= ((1 << (1 << write_size)) - 1) << (write_addr % 8);
+      writeFn(write_addr, out.w_data, strb);
+    }
+    assert(out.w_last == (write_beats_left == 1));
+    --write_beats_left;
+    write_addr = ((write_addr >> write_size) + 1) << write_size;
+  }
+
+  in.aw_ready = write_beats_left == 0 && write_acked;
+  in.ar_ready = read_beats_left == 0;
+
+  // Accept new reads.
+  if (out.ar_valid && in.ar_ready) {
+    read_beats_left = out.ar_len + 1;
+    read_id = out.ar_id;
+    read_addr = out.ar_addr;
+    read_size = out.ar_size;
+  }
+
+  // Accept new writes.
+  if (out.aw_valid && in.aw_ready) {
+    write_beats_left = out.aw_len + 1;
+    write_id = out.aw_id;
+    write_addr = out.aw_addr;
+    write_size = out.aw_size;
+    write_acked = false;
+  }
 }
 
-static void advanceAllClocks(void *state) {
-  DigitalTop_clock(state);
-  DigitalTop_clock_0(state);
-  DigitalTop_clock_1(state);
-  DigitalTop_clock_2(state);
-  DigitalTop_clock_3(state);
-  DigitalTop_clock_4(state);
-  DigitalTop_clock_5(state);
-  DigitalTop_clock_6(state);
-  DigitalTop_clock_7(state);
-  DigitalTop_clock_8(state);
+void AxiPort::update_b() {
+  if (in.r_valid && out.r_ready) {
+    --read_beats_left;
+    read_addr = ((read_addr >> read_size) + 1) << read_size;
+  }
+
+  if (in.b_valid && out.b_ready) {
+    write_acked = true;
+  }
 }
 
 int main(int argc, char **argv) {
@@ -37,8 +199,42 @@ int main(int argc, char **argv) {
   // Process CLI arguments
   //===--------------------------------------------------------------------===//
 
+  bool optRunAll = true;
+  bool optRunArcs = false;
+  bool optRunVtor = false;
+  char *optVcdOutputFile = nullptr;
+
+  char **argOut = argv + 1;
+  for (char **arg = argv + 1, **argEnd = argv + argc; arg != argEnd; ++arg) {
+    if (strcmp(*arg, "--arcs") == 0) {
+      optRunAll = false;
+      optRunArcs = true;
+      continue;
+    }
+    if (strcmp(*arg, "--vtor") == 0) {
+      optRunAll = false;
+      optRunVtor = true;
+      continue;
+    }
+    if (strcmp(*arg, "--trace") == 0) {
+      ++arg;
+      if (arg == argEnd) {
+        std::cerr << "missing trace output file name after `--trace`\n";
+        return 1;
+      }
+      optVcdOutputFile = *arg;
+      continue;
+    }
+    *argOut++ = *arg;
+  }
+  argc = argOut - argv;
+
   if (argc != 2) {
-    std::cerr << "usage: " << argv[0] << " PROGRAM_ELF\n";
+    std::cerr << "usage: " << argv[0] << " [options] <binary>\n";
+    std::cerr << "options:\n";
+    std::cerr << "  --arcs         run arcilator simulation\n";
+    std::cerr << "  --vtor         run verilator simulation\n";
+    std::cerr << "  --trace <VCD>  write trace to <VCD> file\n";
     return 1;
   }
 
@@ -46,7 +242,7 @@ int main(int argc, char **argv) {
   // Read ELF into memory
   //===--------------------------------------------------------------------===//
 
-  std::map<uint32_t, uint64_t> memory;
+  std::map<uint64_t, uint64_t> memory;
   {
     ELFIO::elfio elf;
     if (!elf.load(argv[1])) {
@@ -62,189 +258,74 @@ int main(int argc, char **argv) {
                 << " (virtual address " << segment->get_virtual_address()
                 << ")\n";
       for (unsigned i = 0; i < segment->get_memory_size(); ++i) {
-        uint32_t addr = segment->get_physical_address() + i;
+        uint64_t addr = segment->get_physical_address() + i;
         uint8_t data = 0;
         if (i < segment->get_file_size())
           data = segment->get_data()[i];
-        auto &slot = memory[addr / 4 * 4];
-        slot &= ~(0xFF << ((addr % 4) * 8));
-        slot |= data << ((addr % 4) * 8);
+        auto &slot = memory[addr / 8 * 8];
+        slot &= ~((uint64_t)0xFF << ((addr % 8) * 8));
+        slot |= (uint64_t)data << ((addr % 8) * 8);
       }
     }
+    std::cerr << "entry " << elf.get_entry() << "\n";
     std::cerr << std::dec;
-    std::cerr << "loaded " << memory.size() * 4 << " program bytes\n";
+    std::cerr << "loaded " << memory.size() * 8 << " program bytes\n";
   }
+
+  // Allocate the simulation models.
+  ComparingRocketModel model;
+  if (optRunAll or optRunVtor)
+    model.models.push_back(makeVerilatorModel());
+  if (optRunAll or optRunArcs)
+    model.models.push_back(makeArcilatorModel());
+  if (optVcdOutputFile)
+    model.vcd_start(optVcdOutputFile);
 
   //===--------------------------------------------------------------------===//
   // Model initialization and reset
   //===--------------------------------------------------------------------===//
 
-  DigitalTop model;
-  auto &dut = model.view;
-  void *statePtr = static_cast<void *>(dut.state);
+  model.set_reset(true);
+  for (unsigned i = 0; i < 100; ++i)
+    model.clock();
+  model.set_reset(false);
 
-  DigitalTop_passthrough(statePtr);
-  dut.reset = 1;
-  dut.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_implicit_clock_reset = 1;
-  dut.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_cbus_0_reset = 1;
-  dut.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_mbus_0_reset = 1;
-  dut.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_fbus_0_reset = 1;
-  dut.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_pbus_0_reset = 1;
-  dut.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_sbus_1_reset = 1;
-  dut.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_sbus_0_reset = 1;
-  DigitalTop_passthrough(statePtr);
-
-  unsigned cycle = 0;
-  for (unsigned i = 0; i < 100; ++i) {
-    ++cycle;
-    advanceAllClocks(statePtr);
-    DigitalTop_passthrough(statePtr);
-  }
-
-  auto duration = std::chrono::high_resolution_clock::duration::zero();
-  dut.reset = 0;
-  dut.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_implicit_clock_reset = 0;
-  dut.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_cbus_0_reset = 0;
-  dut.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_mbus_0_reset = 0;
-  dut.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_fbus_0_reset = 0;
-  dut.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_pbus_0_reset = 0;
-  dut.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_sbus_1_reset = 0;
-  dut.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_sbus_0_reset = 0;
+  for (unsigned i = 0; i < 1000; ++i)
+    model.clock();
 
   //===--------------------------------------------------------------------===//
   // Simulation loop
   //===--------------------------------------------------------------------===//
 
-  // Memory to Rocket AXI4 interconnect signals
-  auto &aw_ready = dut.mem_axi4_0_aw_ready; // i1
-  auto &w_ready = dut.mem_axi4_0_w_ready; // i1
-  auto &b_valid = dut.mem_axi4_0_b_valid; // i1
-  auto &b_bits_id = dut.mem_axi4_0_b_bits_id; // i4
-  auto &b_bits_resp = dut.mem_axi4_0_b_bits_resp; // i2
-  auto &ar_ready = dut.mem_axi4_0_ar_ready; // i1
-  auto &r_valid = dut.mem_axi4_0_r_valid; // i1
-  auto &r_bits_id = dut.mem_axi4_0_r_bits_id; // i4
-  auto &r_bits_data = dut.mem_axi4_0_r_bits_data; // i64
-  auto &r_bits_resp = dut.mem_axi4_0_r_bits_resp; // i2
-  auto &r_bits_last = dut.mem_axi4_0_r_bits_last; // i1
-
-  // Rocket to Memory AXI4 interconnect signals
-  auto &aw_valid = dut.mem_axi4_0_aw_valid; // i1
-  auto &aw_bits_id = dut.mem_axi4_0_aw_bits_id; // i4
-  auto &aw_bits_addr = dut.mem_axi4_0_aw_bits_addr; // i32
-  auto &aw_bits_len = dut.mem_axi4_0_aw_bits_len; // i8
-  auto &aw_bits_size = dut.mem_axi4_0_aw_bits_size; // i3
-  auto &aw_bits_burst = dut.mem_axi4_0_aw_bits_burst; // i2
-  auto &aw_bits_lock = dut.mem_axi4_0_aw_bits_lock; // i1
-  auto &aw_bits_cache = dut.mem_axi4_0_aw_bits_cache; // i4
-  auto &aw_bits_prot = dut.mem_axi4_0_aw_bits_prot; // i3
-  auto &aw_bits_qos = dut.mem_axi4_0_aw_bits_qos; // i4
-  auto &w_valid = dut.mem_axi4_0_w_valid; // i1
-  auto &w_bits_data = dut.mem_axi4_0_w_bits_data; // i64
-  auto &w_bits_strb = dut.mem_axi4_0_w_bits_strb; // i8
-  auto &w_bits_last = dut.mem_axi4_0_w_bits_last; // i1
-  auto &b_ready = dut.mem_axi4_0_b_ready; // i1
-  auto &ar_valid = dut.mem_axi4_0_ar_valid; // i1
-  auto &ar_bits_id = dut.mem_axi4_0_ar_bits_id; // i4
-  auto &ar_bits_addr = dut.mem_axi4_0_ar_bits_addr; // i32
-  auto &ar_bits_len = dut.mem_axi4_0_ar_bits_len; // i8
-  auto &ar_bits_size = dut.mem_axi4_0_ar_bits_size; // i3
-  auto &ar_bits_burst = dut.mem_axi4_0_ar_bits_burst; // i2
-  auto &ar_bits_lock = dut.mem_axi4_0_ar_bits_lock; // i1
-  auto &ar_bits_cache = dut.mem_axi4_0_ar_bits_cache; // i4
-  auto &ar_bits_prot = dut.mem_axi4_0_ar_bits_prot; // i3
-  auto &ar_bits_qos = dut.mem_axi4_0_ar_bits_qos; // i4
-  auto &r_ready = dut.mem_axi4_0_r_ready; // i1
-
-  enum {
-    RESP_OKAY = 0b00,
-    RESP_EXOKAY = 0b01,
-    RESP_SLVERR = 0b10,
-    RESP_DECERR = 0b11
+  AxiPort mem_port;
+  mem_port.readFn = [&](size_t addr, size_t &data) {
+    auto it = memory.find(addr / 8 * 8);
+    if (it != memory.end())
+      data = it->second;
+    else
+      data = 0x1050007310500073;
+  };
+  mem_port.writeFn = [&](size_t addr, size_t data, size_t mask) {
+    assert(mask == 0xFF && "only full 64 bit write supported");
+    memory[addr / 8 * 8] = data;
   };
 
-  uint32_t next_raddr;
-  uint32_t next_waddr;
-  bool per_next_read = false;
-  bool per_next_write = false;
-  uint8_t next_rid;
-  uint8_t next_bid;
-  bool next_bvalid = false;
+  size_t num_bad_cycles = 0;
+  for (unsigned i = 0; i < 50000; ++i) {
+    mem_port.out = model.get_mem();
+    mem_port.update_a();
+    model.set_mem(mem_port.in);
+    model.passthrough();
+    mem_port.out = model.get_mem();
+    mem_port.update_b();
+    model.set_mem(mem_port.in);
+    model.clock();
 
-  for (unsigned i = 0; i < 1000000; ++i) {
-    ++cycle;
-
-    // Advance model to next cycle
-    auto t_before = std::chrono::high_resolution_clock::now();
-    advanceAllClocks(statePtr);
-    DigitalTop_passthrough(statePtr);
-    auto t_after = std::chrono::high_resolution_clock::now();
-    duration += t_after - t_before;
-
-    // Handle AXI memory interconnect
-    if (per_next_read) {
-      r_valid = true;
-      auto it = memory.find(next_raddr);
-      if (it != memory.end())
-        r_bits_data = it->second;
-      else
-        r_bits_data = 0x10500073;
-      r_bits_id = next_rid;
-      r_bits_resp = RESP_OKAY;
-      r_bits_last = true;
-    }
-
-    if (next_bvalid) {
-      b_valid = true;
-      b_bits_id = next_bid;
-      b_bits_resp = RESP_OKAY;
-    }
-
-    if (b_ready) {
-      next_bvalid = false;
-      b_valid = false;
-    }
-
-    w_ready = false;
-
-    if (per_next_write && w_valid) {
-      w_ready = true;
-      assert(w_bits_strb == 256);
-      memory[next_waddr] = w_bits_data;
-      assert(w_bits_last == 1);
-      next_bvalid = true;
-    }
-
-    aw_ready = 0;
-    ar_ready = 0;
-    per_next_write = false;
-
-    if (r_ready) {
-      per_next_read = false;
-      r_valid = false;
-    }
-
-    if (aw_valid) {
-      assert(aw_bits_len == 1);
-      aw_ready = 1;
-      next_waddr = aw_bits_addr;
-      per_next_write = true;
-      next_bid = aw_bits_id;
-    }
-    if (ar_valid) {
-      assert(ar_bits_len == 1);
-      ar_ready = 1;
-      next_raddr = ar_bits_addr;
-      per_next_read = true;
-      next_rid = ar_bits_id;
-    }
-
-    // Emit progress indication
-    if (cycle % 10000 == 0) {
-      auto seconds =
-          std::chrono::duration_cast<std::chrono::duration<double>>(duration)
-              .count();
-      std::cerr << "Cycle " << cycle << " [" << (i / seconds) << " Hz]\n";
+    if (model.num_mismatches > 0) {
+      if (++num_bad_cycles >= 3) {
+        std::cerr << "aborting due to port mismatches\n";
+        return 1;
+      }
     }
   }
 

@@ -1,0 +1,76 @@
+CXXFLAGS = -O3 -Wall -std=c++17 -no-pie
+VERILATOR_ROOT ?= $(shell verilator -getenv VERILATOR_ROOT)
+
+mkfile_path := $(dir $(MAKEFILE_LIST))
+REPO_ROOT := $(mkfile_path)/..
+
+ARCILATOR_UTILS_ROOT ?= $(dir $(shell which arcilator))
+BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone/dhrystone.riscv
+
+SOURCE_DIR ?= $(mkfile_path)
+BUILD_DIR ?= $(REPO_ROOT)/build/rocket
+$(shell mkdir -p $(BUILD_DIR))
+
+SOURCE_MODEL ?= $(SOURCE_DIR)/rocket
+BUILD_MODEL ?= $(BUILD_DIR)/rocket
+
+#===-------------------------------------------------------------------------===
+# FIRRTL to HW
+#===-------------------------------------------------------------------------===
+
+$(BUILD_MODEL).fir: $(SOURCE_MODEL).fir.gz
+	gzip -dc $< > $@
+
+$(BUILD_MODEL).mlir: $(BUILD_MODEL).fir
+	firtool --dedup --ir-hw $< -o $@
+
+#===-------------------------------------------------------------------------===
+# Arcilator
+#===-------------------------------------------------------------------------===
+
+$(BUILD_MODEL)-arc.o $(BUILD_MODEL).json: $(BUILD_MODEL).mlir
+	arcilator $< --state-file=$(BUILD_MODEL).json --observe-wires --observe-ports --observe-named-values --mlir-timing -o $(BUILD_MODEL)-arc.ll
+	opt -O3 --strip-debug -S $(BUILD_MODEL)-arc.ll | llc -O3 --filetype=obj -o $(BUILD_MODEL)-arc.o
+	objdump -d $(BUILD_MODEL)-arc.o > $(BUILD_MODEL)-arc.s
+
+$(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
+	python3 $(ARCILATOR_UTILS_ROOT)/arcilator-header-cpp.py $< --view-depth 1 > $@
+
+#===-------------------------------------------------------------------------===
+# Verilator
+#===-------------------------------------------------------------------------===
+
+$(BUILD_MODEL).sv: $(BUILD_MODEL).mlir
+	firtool --dedup --lowering-options=disallowLocalVariables $< -o $@
+
+$(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h: $(BUILD_MODEL).sv $(REPO_ROOT)/verilator-stubs.sv
+	verilator --public -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -Wno-WIDTH --trace -CFLAGS -DVL_TIME_CONTEXT --trace-underscore
+	cp $(BUILD_MODEL)-vtor/Vrocket__ALL.a $(BUILD_MODEL)-vtor.a
+	cp $(BUILD_MODEL)-vtor/Vrocket.h $(BUILD_MODEL)-vtor.h
+
+#===-------------------------------------------------------------------------===
+# Testbench
+#===-------------------------------------------------------------------------===
+
+$(BUILD_MODEL)-model-arc.o: $(SOURCE_MODEL)-model-arc.cpp $(SOURCE_MODEL)-model.h $(BUILD_MODEL)-arc.h
+	$(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -c $< -o $@
+
+$(BUILD_MODEL)-model-vtor.o: $(SOURCE_MODEL)-model-vtor.cpp $(SOURCE_MODEL)-model.h $(BUILD_MODEL)-vtor.h
+	$(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -I/$(VERILATOR_ROOT)/include -c $< -o $@
+
+$(BUILD_MODEL)-main: $(SOURCE_MODEL)-main.cpp $(BUILD_MODEL)-model-arc.o $(BUILD_MODEL)-arc.o $(BUILD_MODEL)-model-vtor.o $(BUILD_MODEL)-vtor.a $(VERILATOR_ROOT)/include/verilated.cpp $(VERILATOR_ROOT)/include/verilated_vcd_c.cpp $(VERILATOR_ROOT)/include/verilated_threads.cpp
+	$(CXX) $(CXXFLAGS) -g -I$(REPO_ROOT)/elfio $^ -o $@
+
+#===-------------------------------------------------------------------------===
+# Convenience
+#===-------------------------------------------------------------------------===
+
+run: $(BUILD_MODEL)-main
+	./$(BUILD_MODEL)-main $(BINARY) $(RUN_ARGS)
+
+run-arcs: RUN_ARGS += "--arcs"
+run-arcs: run
+run-vtor: RUN_ARGS += "--vtor"
+run-vtor: run
+run-trace: RUN_ARGS += "--trace $(BUILD_MODEL).vcd"
+run-trace: run
