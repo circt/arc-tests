@@ -18,7 +18,9 @@ public:
   void vcd_start(const char *outputFile) override {
     Verilated::traceEverOn(true);
     model_vcd = std::make_unique<VerilatedVcdC>();
+#ifdef TRACE
     model.trace(model_vcd.get(), 10000);
+#endif
     model_vcd->open(outputFile);
   }
 

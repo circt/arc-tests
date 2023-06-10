@@ -14,6 +14,19 @@ $(shell mkdir -p $(BUILD_DIR))
 SOURCE_MODEL ?= $(SOURCE_DIR)/rocket
 BUILD_MODEL ?= $(BUILD_DIR)/rocket
 
+ARCILATOR_ARGS ?= --mlir-timing
+VERILATOR_ARGS ?= -DPRINTF_COND=0
+
+TRACE ?= 1
+
+ifeq ($(TRACE),1)
+	ARCILATOR_ARGS += --observe-wires --observe-ports --observe-named-values
+	VERILATOR_ARGS += --trace --trace-underscore
+	CXXFLAGS += -DTRACE
+else
+	ARCILATOR_ARGS += --observe-wires=0 --observe-ports=0 --observe-named-values=0
+endif
+
 #===-------------------------------------------------------------------------===
 # FIRRTL to HW
 #===-------------------------------------------------------------------------===
@@ -29,7 +42,7 @@ $(BUILD_MODEL).mlir: $(BUILD_MODEL).fir
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL)-arc.o $(BUILD_MODEL).json: $(BUILD_MODEL).mlir
-	arcilator $< --state-file=$(BUILD_MODEL).json --observe-wires --observe-ports --observe-named-values --mlir-timing -o $(BUILD_MODEL)-arc.ll
+	arcilator $< --state-file=$(BUILD_MODEL).json -o $(BUILD_MODEL)-arc.ll $(ARCILATOR_ARGS)
 	opt -O3 --strip-debug -S $(BUILD_MODEL)-arc.ll | llc -O3 --filetype=obj -o $(BUILD_MODEL)-arc.o
 	objdump -d $(BUILD_MODEL)-arc.o > $(BUILD_MODEL)-arc.s
 
@@ -44,7 +57,7 @@ $(BUILD_MODEL).sv: $(BUILD_MODEL).mlir
 	firtool --dedup --lowering-options=disallowLocalVariables $< -o $@
 
 $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h: $(BUILD_MODEL).sv $(REPO_ROOT)/verilator-stubs.sv
-	verilator --public -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -Wno-WIDTH --trace -CFLAGS -DVL_TIME_CONTEXT --trace-underscore
+	verilator --public -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS)
 	cp $(BUILD_MODEL)-vtor/Vrocket__ALL.a $(BUILD_MODEL)-vtor.a
 	cp $(BUILD_MODEL)-vtor/Vrocket.h $(BUILD_MODEL)-vtor.h
 
@@ -68,9 +81,9 @@ $(BUILD_MODEL)-main: $(SOURCE_MODEL)-main.cpp $(BUILD_MODEL)-model-arc.o $(BUILD
 run: $(BUILD_MODEL)-main
 	./$(BUILD_MODEL)-main $(BINARY) $(RUN_ARGS)
 
-run-arcs: RUN_ARGS += "--arcs"
+run-arcs: RUN_ARGS += --arcs
 run-arcs: run
-run-vtor: RUN_ARGS += "--vtor"
+run-vtor: RUN_ARGS += --vtor
 run-vtor: run
-run-trace: RUN_ARGS += "--trace $(BUILD_MODEL).vcd"
+run-trace: RUN_ARGS += --trace $(BUILD_MODEL).vcd
 run-trace: run
