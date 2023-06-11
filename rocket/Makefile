@@ -6,9 +6,10 @@ REPO_ROOT := $(mkfile_path)/..
 
 ARCILATOR_UTILS_ROOT ?= $(dir $(shell which arcilator))
 BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone/dhrystone.riscv
+CONFIG ?= small
 
 SOURCE_DIR ?= $(mkfile_path)
-BUILD_DIR ?= $(REPO_ROOT)/build/rocket
+BUILD_DIR ?= $(REPO_ROOT)/build/rocket-$(CONFIG)
 $(shell mkdir -p $(BUILD_DIR))
 
 SOURCE_MODEL ?= $(SOURCE_DIR)/rocket
@@ -31,7 +32,7 @@ endif
 # FIRRTL to HW
 #===-------------------------------------------------------------------------===
 
-$(BUILD_MODEL).fir: $(SOURCE_MODEL).fir.gz
+$(BUILD_MODEL).fir: $(SOURCE_MODEL)-$(CONFIG).fir.gz
 	gzip -dc $< > $@
 
 $(BUILD_MODEL).mlir: $(BUILD_MODEL).fir

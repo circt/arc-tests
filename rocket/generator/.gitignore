@@ -1,5 +1,8 @@
 .*
 !.git*
-/project
-/target
 /bootrom.elf
+/build
+/lib
+/project
+/rocket-chip
+/target

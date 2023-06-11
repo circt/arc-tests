@@ -16,7 +16,13 @@ Run Rocket benchmarks as follows:
 - `make -C rocket run-arcs`: Arcilator only.
 - `make -C rocket run-vtor`: Verilator only.
 
-Pass `BINARY=<binary>` to make to run a specific benchmark.
+Pass `BINARY=<binary>` to make to run a specific benchmark. Pick one of the configs as follows:
+
+- `CONFIG=small`
+- `CONFIG=medium`
+- `CONFIG=large`
+
+To generate new Rocket designs, tweak the `rocket/generator/arc.scala` file and run `make -C rocket/generator` to rebuild the `rocket/*.fir.gz` files used for the benchmarks.
 
 
 ### BOOM
