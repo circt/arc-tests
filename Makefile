@@ -41,7 +41,7 @@ $(MODEL)-main: $(mkfile_path)/$(MODEL)/$(MODEL)-main.cpp $(MODEL).h $(MODEL).o
 
 asm: $(MODEL).mlir
 	arcilator $< --until-before=$(DEBUG_STAGE) -o $(MODEL)-before-$(DEBUG_STAGE).mlir
-	arcilator $(MODEL)-before-$(DEBUG-STAGE).mlir --print-debug-info | llc -O3 --filetype=asm -o $(MODEL).s
+	arcilator $(MODEL)-before-$(DEBUG_STAGE).mlir --print-debug-info | llc -O3 --filetype=asm -o $(MODEL).s
 
 run: $(MODEL)-main
 	./$(MODEL)-main $(BINARY)
