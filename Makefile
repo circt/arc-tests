@@ -29,7 +29,7 @@ $(MODEL).o $(MODEL).json: $(MODEL).mlir
 	arcilator $< --state-file=$(MODEL).json | opt -O3 --strip-debug -S | llc -O3 --filetype=obj -o $(MODEL).o
 
 $(MODEL).h: $(MODEL).json
-	python $(ARCILATOR_UTILS_ROOT)/arcilator-header-cpp.py $< > $@
+	python $(ARCILATOR_UTILS_ROOT)/arcilator-header-cpp.py $< --view-depth 1 > $@
 
 $(MODEL).sv: $(MODEL).fir
 	firtool --verilog --dedup=1 $< -o $@
