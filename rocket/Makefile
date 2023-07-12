@@ -80,7 +80,7 @@ $(BUILD_MODEL)-main: $(SOURCE_MODEL)-main.cpp $(BUILD_MODEL)-model-arc.o $(BUILD
 #===-------------------------------------------------------------------------===
 
 run: $(BUILD_MODEL)-main
-	./$(BUILD_MODEL)-main $(BINARY) $(RUN_ARGS)
+	$(BUILD_MODEL)-main $(BINARY) $(RUN_ARGS)
 
 run-arcs: RUN_ARGS += --arcs
 run-arcs: run
@@ -88,3 +88,14 @@ run-vtor: RUN_ARGS += --vtor
 run-vtor: run
 run-trace: RUN_ARGS += --trace $(BUILD_MODEL).vcd
 run-trace: run
+
+benchmark: $(BUILD_MODEL)-main
+	$(REPO_ROOT)/benchmark.py -- $(BUILD_MODEL)-main $(BINARY) $(RUN_ARGS)
+
+benchmark-arcs: RUN_ARGS += --arcs
+benchmark-arcs: benchmark
+benchmark-vtor: RUN_ARGS += --vtor
+benchmark-vtor: benchmark
+
+hyperfine: $(BUILD_MODEL)-main
+	hyperfine --warmup=3 "$(BUILD_MODEL)-main $(BINARY) --arcs" "$(BUILD_MODEL)-main $(BINARY) --vtor"

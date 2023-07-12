@@ -1,5 +1,7 @@
 .*
 !.git*
-/build
 *.vcd
 *.gtkw
+*.log
+*.out
+/build
