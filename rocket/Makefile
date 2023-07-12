@@ -18,7 +18,7 @@ BUILD_MODEL ?= $(BUILD_DIR)/rocket
 ARCILATOR_ARGS ?= --mlir-timing --print-debug-info
 VERILATOR_ARGS ?= -DPRINTF_COND=0 -DASSERT_VERBOSE_COND=0 -DSTOP_COND=0
 
-TRACE ?= 1
+TRACE ?= 0
 
 ifeq ($(TRACE),1)
 	ARCILATOR_ARGS += --observe-wires --observe-ports --observe-named-values
