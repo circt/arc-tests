@@ -1,6 +1,7 @@
 .*
 !.git*
 /bootrom.elf
+/bootrom.dump
 /build
 /lib
 /project
