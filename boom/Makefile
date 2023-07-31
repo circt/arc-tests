@@ -42,7 +42,7 @@ $(BUILD_MODEL).mlir: $(BUILD_MODEL).fir
 # Arcilator
 #===-------------------------------------------------------------------------===
 
-$(BUILD_MODEL)-arc.o $(BUILD_MODEL).json: $(BUILD_MODEL).mlir
+$(BUILD_MODEL)-arc.o $(BUILD_MODEL).json &: $(BUILD_MODEL).mlir
 	arcilator $< --state-file=$(BUILD_MODEL).json -o $(BUILD_MODEL)-arc.ll $(ARCILATOR_ARGS)
 	opt -O3 -S $(BUILD_MODEL)-arc.ll | llc -O3 --filetype=obj -o $(BUILD_MODEL)-arc.o
 	objdump -d $(BUILD_MODEL)-arc.o > $(BUILD_MODEL)-arc.s
@@ -57,7 +57,7 @@ $(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
 $(BUILD_MODEL).sv: $(BUILD_MODEL).mlir
 	firtool --dedup --lowering-options=disallowLocalVariables $< -o $@
 
-$(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h: $(BUILD_MODEL).sv $(REPO_ROOT)/verilator-stubs.sv
+$(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h &: $(BUILD_MODEL).sv $(REPO_ROOT)/verilator-stubs.sv
 	verilator -O3 --public -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS)
 	cp $(BUILD_MODEL)-vtor/Vboom__ALL.a $(BUILD_MODEL)-vtor.a
 	cp $(BUILD_MODEL)-vtor/Vboom.h $(BUILD_MODEL)-vtor.h

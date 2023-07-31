@@ -42,7 +42,7 @@ public:
     DigitalTop_clock(&model.storage[0]);
     // DigitalTop_clock_0(&model.storage[0]);
     // DigitalTop_clock_1(&model.storage[0]);
-    // DigitalTop_clock_2(&model.storage[0]);
+    DigitalTop_clock_2(&model.storage[0]);
     // DigitalTop_clock_3(&model.storage[0]);
     // DigitalTop_clock_4(&model.storage[0]);
     // DigitalTop_clock_5(&model.storage[0]);
