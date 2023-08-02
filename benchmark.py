@@ -43,8 +43,8 @@ if args.verbose:
 
 # Compute the execution frequency median.
 freqs = list()
-for match in re.findall(r'(\d+) Hz', hfout):
-    freqs.append(int(match))
+for match, _ in re.findall(r'(\d+(\.\d+)?) Hz', hfout):
+    freqs.append(float(match))
 freqs.sort()
 if not freqs:
     print("no frequency info found in simulator output", file=sys.stderr)

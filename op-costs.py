@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
-# Example: cat callgrind.log | ./op-costs.py | sort -n
+# Example:
+#   callgrind_annotate --show=Ir callgrind.out > callgrind.log
+#   cat callgrind.log | ./op-costs.py | sort -n
 
 import re
 import sys
