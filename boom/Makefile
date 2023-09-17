@@ -33,12 +33,10 @@ endif
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL).fir: $(SOURCE_MODEL)-$(CONFIG).fir.gz
-	gzip -dc $< | sed 's/circuit DigitalTop :/circuit DigitalTopWrapper :/' > $@
-	echo >> $@
-	cat $(SOURCE_DIR)/single-clock.fir >> $@
+	gzip -dc $< > $@
 
 $(BUILD_MODEL).mlir: $(BUILD_MODEL).fir
-	firtool --dedup --ir-hw $< -o $@
+	firtool --ir-hw $< -o $@
 
 #===-------------------------------------------------------------------------===
 # Arcilator
@@ -57,7 +55,7 @@ $(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL).sv: $(BUILD_MODEL).mlir
-	firtool --dedup --lowering-options=disallowLocalVariables,mitigateVivadoArrayIndexConstPropBug $< -o $@
+	firtool --lowering-options=disallowLocalVariables,mitigateVivadoArrayIndexConstPropBug $< -o $@
 
 $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h &: $(BUILD_MODEL).sv $(REPO_ROOT)/verilator-stubs.sv
 	verilator -O3 --public -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS)

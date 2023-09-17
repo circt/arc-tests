@@ -41,21 +41,28 @@ public:
       model->vcd_dump(cycle);
   }
 
-  void clock() override {
+  void clock() {
     compare_ports();
-    for (auto &model : models) {
-      model->vcd_dump(cycle);
-      auto t_before = std::chrono::high_resolution_clock::now();
-      model->clock();
-      auto t_after = std::chrono::high_resolution_clock::now();
-      model->duration += t_after - t_before;
-    }
+    vcd_dump(cycle);
+    set_clock(true);
+    eval();
+    set_clock(false);
+    eval();
     ++cycle;
   }
 
-  void passthrough() override {
+  void eval() override {
+    for (auto &model : models) {
+      auto t_before = std::chrono::high_resolution_clock::now();
+      model->eval();
+      auto t_after = std::chrono::high_resolution_clock::now();
+      model->duration += t_after - t_before;
+    }
+  }
+
+  void set_clock(bool clock) override {
     for (auto &model : models)
-      model->passthrough();
+      model->set_clock(clock);
   }
 
   void set_reset(bool reset) override {
@@ -285,13 +292,10 @@ int main(int argc, char **argv) {
   // Model initialization and reset
   //===--------------------------------------------------------------------===//
 
-  model.set_reset(true);
-  for (unsigned i = 0; i < 100; ++i)
+  for (unsigned i = 0; i < 1000; ++i) {
+    model.set_reset(i < 100);
     model.clock();
-  model.set_reset(false);
-
-  for (unsigned i = 0; i < 1000; ++i)
-    model.clock();
+  }
 
   //===--------------------------------------------------------------------===//
   // Simulation loop
@@ -315,7 +319,7 @@ int main(int argc, char **argv) {
     mem_port.out = model.get_mem();
     mem_port.update_a();
     model.set_mem(mem_port.in);
-    model.passthrough();
+    model.eval();
     mem_port.out = model.get_mem();
     mem_port.update_b();
     model.set_mem(mem_port.in);

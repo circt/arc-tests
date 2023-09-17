@@ -3,15 +3,11 @@
 #include <fstream>
 #include <optional>
 
-extern "C" {
-void DigitalTopWrapper_clock(void *state);
-}
-
 namespace {
 class ArcilatorBoomModel : public BoomModel {
-  DigitalTopWrapper model;
+  DigitalTop model;
   std::ofstream vcd_stream;
-  std::unique_ptr<ValueChangeDump<DigitalTopWrapperLayout>> model_vcd;
+  std::unique_ptr<ValueChangeDump<DigitalTopLayout>> model_vcd;
 
 public:
   ArcilatorBoomModel() { name = "arcs"; }
@@ -19,7 +15,7 @@ public:
   void vcd_start(const char *outputFile) override {
     vcd_stream.open(outputFile);
     model_vcd.reset(
-        new ValueChangeDump<DigitalTopWrapperLayout>(model.vcd(vcd_stream)));
+        new ValueChangeDump<DigitalTopLayout>(model.vcd(vcd_stream)));
   }
 
   void vcd_dump(size_t cycle) override {
@@ -29,14 +25,7 @@ public:
     }
   }
 
-  void clock() override {
-    DigitalTopWrapper_clock(&model.storage[0]);
-    DigitalTopWrapper_passthrough(&model.storage[0]);
-  }
-
-  void passthrough() override {
-    DigitalTopWrapper_passthrough(&model.storage[0]);
-  }
+  void eval() override { DigitalTop_eval(&model.storage[0]); }
 
   Ports get_ports() override {
     return {
@@ -48,6 +37,26 @@ public:
   void set_reset(bool reset) override {
     // clang-format off
     model.view.reset = reset;
+    model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_implicit_clock_reset = reset;
+    model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_cbus_0_reset = reset;
+    model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_mbus_0_reset = reset;
+    model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_fbus_0_reset = reset;
+    model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_pbus_0_reset = reset;
+    model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_sbus_1_reset = reset;
+    model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_sbus_0_reset = reset;
+    // clang-format on
+  }
+
+  void set_clock(bool clock) {
+    // clang-format off
+    model.view.clock = clock;
+    model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_implicit_clock_clock = clock;
+    model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_cbus_0_clock = clock;
+    model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_mbus_0_clock = clock;
+    model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_fbus_0_clock = clock;
+    model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_pbus_0_clock = clock;
+    model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_sbus_1_clock = clock;
+    model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_sbus_0_clock = clock;
     // clang-format on
   }
 

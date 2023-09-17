@@ -29,14 +29,7 @@ public:
       model_vcd->dump(static_cast<uint64_t>(cycle));
   }
 
-  void clock() override {
-    set_clock(true);
-    model.eval();
-    set_clock(false);
-    model.eval();
-  }
-
-  void passthrough() override { model.eval(); }
+  void eval() override { model.eval(); }
 
   Ports get_ports() override {
     return {
@@ -48,26 +41,12 @@ public:
   void set_reset(bool reset) override {
     // clang-format off
     model.reset = reset;
-    // model.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_implicit_clock_reset = reset;
-    // model.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_cbus_0_reset = reset;
-    // model.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_mbus_0_reset = reset;
-    // model.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_fbus_0_reset = reset;
-    // model.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_pbus_0_reset = reset;
-    // model.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_sbus_1_reset = reset;
-    // model.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_sbus_0_reset = reset;
     // clang-format on
   }
 
   void set_clock(bool clock) {
     // clang-format off
     model.clock = clock;
-    // model.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_implicit_clock_clock = clock;
-    // model.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_cbus_0_clock = clock;
-    // model.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_mbus_0_clock = clock;
-    // model.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_fbus_0_clock = clock;
-    // model.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_pbus_0_clock = clock;
-    // model.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_sbus_1_clock = clock;
-    // model.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_sbus_0_clock = clock;
     // clang-format on
   }
 

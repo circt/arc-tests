@@ -3,19 +3,6 @@
 #include <fstream>
 #include <optional>
 
-extern "C" {
-void RocketSystem_clock(void *state);
-void RocketSystem_clock_0(void *state);
-void RocketSystem_clock_1(void *state);
-void RocketSystem_clock_2(void *state);
-void RocketSystem_clock_3(void *state);
-void RocketSystem_clock_4(void *state);
-void RocketSystem_clock_5(void *state);
-void RocketSystem_clock_6(void *state);
-void RocketSystem_clock_7(void *state);
-void RocketSystem_clock_8(void *state);
-}
-
 namespace {
 class ArcilatorRocketModel : public RocketModel {
   RocketSystem model;
@@ -38,21 +25,7 @@ public:
     }
   }
 
-  void clock() override {
-    RocketSystem_clock(&model.storage[0]);
-    // RocketSystem_clock_0(&model.storage[0]);
-    // RocketSystem_clock_1(&model.storage[0]);
-    // RocketSystem_clock_2(&model.storage[0]);
-    // RocketSystem_clock_3(&model.storage[0]);
-    // RocketSystem_clock_4(&model.storage[0]);
-    // RocketSystem_clock_5(&model.storage[0]);
-    // RocketSystem_clock_6(&model.storage[0]);
-    // RocketSystem_clock_7(&model.storage[0]);
-    // RocketSystem_clock_8(&model.storage[0]);
-    RocketSystem_passthrough(&model.storage[0]);
-  }
-
-  void passthrough() override { RocketSystem_passthrough(&model.storage[0]); }
+  void eval() override { RocketSystem_eval(&model.storage[0]); }
 
   Ports get_ports() override {
     return {
@@ -64,13 +37,12 @@ public:
   void set_reset(bool reset) override {
     // clang-format off
     model.view.reset = reset;
-    // model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_implicit_clock_reset = reset;
-    // model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_cbus_0_reset = reset;
-    // model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_mbus_0_reset = reset;
-    // model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_fbus_0_reset = reset;
-    // model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_pbus_0_reset = reset;
-    // model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_sbus_1_reset = reset;
-    // model.view.auto_prci_ctrl_domain_tileResetSetter_clock_in_member_allClocks_subsystem_sbus_0_reset = reset;
+    // clang-format on
+  }
+
+  void set_clock(bool clock) {
+    // clang-format off
+    model.view.clock = clock;
     // clang-format on
   }
 
