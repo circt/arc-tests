@@ -34,6 +34,9 @@ endif
 
 $(BUILD_MODEL).fir: $(SOURCE_MODEL)-$(CONFIG).fir.gz
 	gzip -dc $< > $@
+	sed -i 's/circuit DigitalTop :/circuit DigitalTopWrapper :/' $@
+	echo >> $@
+	cat $(SOURCE_DIR)/single-clock.fir >> $@
 
 $(BUILD_MODEL).mlir: $(BUILD_MODEL).fir
 	firtool --dedup --ir-hw $< -o $@
