@@ -33,8 +33,7 @@ endif
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL).fir: $(SOURCE_MODEL)-$(CONFIG).fir.gz
-	gzip -dc $< > $@
-	sed -i 's/circuit DigitalTop :/circuit DigitalTopWrapper :/' $@
+	gzip -dc $< | sed 's/circuit DigitalTop :/circuit DigitalTopWrapper :/' > $@
 	echo >> $@
 	cat $(SOURCE_DIR)/single-clock.fir >> $@
 
