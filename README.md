@@ -27,9 +27,20 @@ To generate new Rocket designs, tweak the `rocket/generator/arc.scala` file and 
 
 ### BOOM
 
-The `largeBoom` directory contains a compiled and slightly modified version of the [The Berkeley Out-of-Order RISC-V Processor](https://github.com/riscv-boom/riscv-boom) published under the licenses in the same folder using [Chipyard](https://github.com/ucb-bar/chipyard) with the `largeBoomConfig` configuration. It also contains a custom-written driver for Arcilator.
+The `boom` directory contains a compiled and slightly modified version of the [The Berkeley Out-of-Order RISC-V Processor](https://github.com/riscv-boom/riscv-boom) published under the licenses in the same folder using [Chipyard](https://github.com/ucb-bar/chipyard). It also contains a custom-written driver for Arcilator.
 
-Run benchmarks with `make run MODEL=largeBoom BINARY=<binary>`.
+Run BOOM benchmarks the same as Rocket, for example:
+
+- `make -C boom run`
+- `make -C boom run-trace`
+- `make -C boom run-arcs`
+- `make -C boom run-vtor`
+
+Pick one of the configs as follows:
+
+- `CONFIG=small`
+- `CONFIG=large`
+
 
 ### Riscinator
 
