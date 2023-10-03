@@ -58,7 +58,7 @@ $(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL).sv: $(BUILD_MODEL).mlir
-	firtool --dedup --lowering-options=disallowLocalVariables $< -o $@
+	firtool --dedup --lowering-options=disallowLocalVariables,mitigateVivadoArrayIndexConstPropBug $< -o $@
 
 $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h &: $(BUILD_MODEL).sv $(REPO_ROOT)/verilator-stubs.sv
 	verilator -O3 --public -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS)
