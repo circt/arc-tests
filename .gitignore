@@ -4,4 +4,4 @@
 *.gtkw
 *.log
 *.out
-/build
+build

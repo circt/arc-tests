@@ -1,18 +1,14 @@
 CXXFLAGS = -O3 -Wall -std=c++17 -no-pie
 VERILATOR_ROOT ?= $(shell verilator -getenv VERILATOR_ROOT)
-
-mkfile_path := $(dir $(MAKEFILE_LIST))
-REPO_ROOT := $(mkfile_path)/..
-
 ARCILATOR_UTILS_ROOT ?= $(dir $(shell which arcilator))
+REPO_ROOT := ..
 BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone/dhrystone.riscv
 CONFIG ?= small
 
-SOURCE_DIR ?= $(mkfile_path)
-BUILD_DIR ?= $(REPO_ROOT)/build/boom-$(CONFIG)
+BUILD_DIR ?= build/$(CONFIG)
 $(shell mkdir -p $(BUILD_DIR))
 
-SOURCE_MODEL ?= $(SOURCE_DIR)/boom
+SOURCE_MODEL ?= boom
 BUILD_MODEL ?= $(BUILD_DIR)/boom
 
 ARCILATOR_ARGS ?= --mlir-timing --print-debug-info
