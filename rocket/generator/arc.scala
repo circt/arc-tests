@@ -17,8 +17,11 @@ class BaseConfig extends Config(
 )
 
 class SmallConfig extends Config(new WithNSmallCores(1) ++ new BaseConfig)
-class MediumConfig extends Config(new WithNBigCores(1) ++ new BaseConfig)
-class LargeConfig extends Config(new WithNBigCores(2) ++ new BaseConfig)
+class DualSmallConfig extends Config(new WithNSmallCores(2) ++ new BaseConfig)
+class MediumConfig extends Config(new WithNMedCores(1) ++ new BaseConfig)
+class DualMediumConfig extends Config(new WithNMedCores(2) ++ new BaseConfig)
+class LargeConfig extends Config(new WithNBigCores(1) ++ new BaseConfig)
+class DualLargeConfig extends Config(new WithNBigCores(2) ++ new BaseConfig)
 
 class RocketSystem(implicit p: Parameters) extends RocketSubsystem
     with CanHaveMasterAXI4MemPort

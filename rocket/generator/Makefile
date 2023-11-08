@@ -2,28 +2,38 @@ ROCKET_URL ?= https://github.com/chipsalliance/rocket-chip.git
 ROCKET_TAG ?= v1.6
 
 all: bootrom.img
-all: small medium large
+all: small dual-small medium dual-medium large dual-large
 
 small: CONFIG=SmallConfig
-small: ../rocket-small.fir.gz
+small: ../rocket-small-$(ROCKET_TAG).fir.gz
+
+dual-small: CONFIG=DualSmallConfig
+dual-small: ../rocket-dual-small-$(ROCKET_TAG).fir.gz
 
 medium: CONFIG=MediumConfig
-medium: ../rocket-medium.fir.gz
+medium: ../rocket-medium-$(ROCKET_TAG).fir.gz
+
+dual-medium: CONFIG=DualMediumConfig
+dual-medium: ../rocket-dual-medium-$(ROCKET_TAG).fir.gz
 
 large: CONFIG=LargeConfig
-large: ../rocket-large.fir.gz
+large: ../rocket-large-$(ROCKET_TAG).fir.gz
 
-../rocket-%.fir.gz: lib/rocketchip.jar arc.scala bootrom.img
+dual-large: CONFIG=DualLargeConfig
+dual-large: ../rocket-dual-large-$(ROCKET_TAG).fir.gz
+
+../rocket-%-$(ROCKET_TAG).fir.gz: lib/rocketchip-$(ROCKET_TAG).jar arc.scala bootrom.img
 	mkdir -p build
+	cd lib && find . -type f -not -name 'rocketchip-$(ROCKET_TAG).jar' -delete
 	sbt "runMain freechips.rocketchip.system.Generator -td build -T arc.RocketSystem -C arc.$(CONFIG)"
 	gzip -c build/arc.$(CONFIG).fir > $@
 
-lib/rocketchip.jar: rocket-chip
+lib/rocketchip-$(ROCKET_TAG).jar: rocket-chip-$(ROCKET_TAG)
 	mkdir -p lib
-	cd rocket-chip && sbt assembly
-	cp rocket-chip/rocketchip.jar $@
+	cd rocket-chip-$(ROCKET_TAG) && sbt assembly
+	cp rocket-chip-$(ROCKET_TAG)/rocketchip.jar $@
 
-rocket-chip:
+rocket-chip-$(ROCKET_TAG):
 	git clone --depth 1 --branch $(ROCKET_TAG) --recursive $(ROCKET_URL) $@
 
 bootrom.img: bootrom.S

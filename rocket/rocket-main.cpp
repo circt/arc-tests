@@ -7,6 +7,14 @@
 #include <iostream>
 #include <map>
 
+#define TOHOST_ADDR 0x60000000
+#define FROMHOST_ADDR 0x60000040
+#define TOHOST_DATA_ADDR 0x60000080
+#define TOHOST_DATA_SIZE 256 // bytes
+#define SYS_write 64
+
+static bool finished = false;
+
 RocketModel::~RocketModel() {}
 
 class ComparingRocketModel : public RocketModel {
@@ -79,6 +87,17 @@ public:
     if (models.empty())
       return {};
     return models[0]->get_mem();
+  }
+
+  void set_mmio(AxiInputs &in) override {
+    for (auto &model : models)
+      model->set_mmio(in);
+  }
+
+  AxiOutputs get_mmio() override {
+    if (models.empty())
+      return {};
+    return models[0]->get_mmio();
   }
 
   void compare_ports() {
@@ -314,16 +333,64 @@ int main(int argc, char **argv) {
     memory[addr / 8 * 8] = data;
   };
 
+
+  AxiPort mmio_port;
+  mmio_port.writeFn = [&](size_t addr, size_t data, size_t mask) {
+    assert(mask == 0xFF && "only full 64 bit write supported");
+    memory[addr / 8 * 8] = data;
+
+    // For a zero return code from the main function, 1 is written to tohost.
+    if (addr == TOHOST_ADDR) {
+      if (data == 1) {
+        finished = true;
+        std::cout << "Benchmark run successful!\n";
+        return;
+      }
+
+      if (data == SYS_write) {
+        for (int i = 0; i < 2000; i += 8) {
+          uint64_t data = memory[TOHOST_DATA_ADDR + i * 8];
+          unsigned char c[8];
+          *(uint64_t*) c = data;
+          for (int k = 0; k < 8; ++k) {
+            std::cout << c[k];
+            if ((unsigned char) c[k] == 0)
+              return;
+          }
+        }
+      }
+    }
+  };
+  mmio_port.readFn = [&](size_t addr, size_t &data) {
+    // Core loops on condition fromhost=0, thus set it to something non-zero.
+    if (addr == FROMHOST_ADDR)
+      data = -1;
+  };
+
   size_t num_bad_cycles = 0;
-  for (unsigned i = 0; i < 50000; ++i) {
+  for (unsigned i = 0; i < 1000000; ++i) {
     mem_port.out = model.get_mem();
     mem_port.update_a();
     model.set_mem(mem_port.in);
+
+    mmio_port.out = model.get_mmio();
+    mmio_port.update_a();
+    model.set_mmio(mmio_port.in);
+
     model.eval();
+
     mem_port.out = model.get_mem();
     mem_port.update_b();
     model.set_mem(mem_port.in);
+
+    mmio_port.out = model.get_mmio();
+    mmio_port.update_b();
+    model.set_mmio(mmio_port.in);
+
     model.clock();
+
+    if (finished)
+      return 0;
 
     if (model.num_mismatches > 0) {
       if (++num_bad_cycles >= 3) {
