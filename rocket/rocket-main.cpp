@@ -53,18 +53,19 @@ public:
     compare_ports();
     vcd_dump(cycle);
     set_clock(true);
-    eval();
+    eval(true);
     set_clock(false);
     eval();
     ++cycle;
   }
 
-  void eval() override {
+  void eval(bool update = false) override {
     for (auto &model : models) {
       auto t_before = std::chrono::high_resolution_clock::now();
-      model->eval();
+      model->eval(update);
       auto t_after = std::chrono::high_resolution_clock::now();
-      model->duration += t_after - t_before;
+      // if (update)
+        model->duration += t_after - t_before;
     }
   }
 
@@ -228,6 +229,7 @@ int main(int argc, char **argv) {
   bool optRunAll = true;
   bool optRunArcs = false;
   bool optRunVtor = false;
+  bool optRunEssent = false;
   char *optVcdOutputFile = nullptr;
 
   char **argOut = argv + 1;
@@ -242,6 +244,13 @@ int main(int argc, char **argv) {
       optRunVtor = true;
       continue;
     }
+#ifdef RUN_ESSENT
+    if (strcmp(*arg, "--essent") == 0) {
+      optRunAll = false;
+      optRunEssent = true;
+      continue;
+    }
+#endif
     if (strcmp(*arg, "--trace") == 0) {
       ++arg;
       if (arg == argEnd) {
@@ -260,6 +269,9 @@ int main(int argc, char **argv) {
     std::cerr << "options:\n";
     std::cerr << "  --arcs         run arcilator simulation\n";
     std::cerr << "  --vtor         run verilator simulation\n";
+#ifdef RUN_ESSENT
+    std::cerr << "  --essent       run essent simulation\n";
+#endif
     std::cerr << "  --trace <VCD>  write trace to <VCD> file\n";
     return 1;
   }
@@ -304,6 +316,10 @@ int main(int argc, char **argv) {
     model.models.push_back(makeVerilatorModel());
   if (optRunAll || optRunArcs)
     model.models.push_back(makeArcilatorModel());
+#ifdef RUN_ESSENT
+  if (optRunAll || optRunEssent)
+    model.models.push_back(makeEssentModel());
+#endif
   if (optVcdOutputFile)
     model.vcd_start(optVcdOutputFile);
 

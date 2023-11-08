@@ -1,14 +1,16 @@
 CXXFLAGS = -O3 -Wall -std=c++17 -no-pie
 VERILATOR_ROOT ?= $(shell verilator -getenv VERILATOR_ROOT)
 
-mkfile_path := $(dir $(MAKEFILE_LIST))
-REPO_ROOT := $(mkfile_path)/..
+mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
+mkfile_dir := $(dir $(mkfile_path))
+
+REPO_ROOT := $(mkfile_dir)..
 
 ARCILATOR_UTILS_ROOT ?= $(dir $(shell which arcilator))
 BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone.riscv
 CONFIG ?= small
 
-SOURCE_DIR ?= $(mkfile_path)
+SOURCE_DIR ?= $(mkfile_dir)
 BUILD_DIR ?= $(REPO_ROOT)/build/rocket-$(CONFIG)
 $(shell mkdir -p $(BUILD_DIR))
 
@@ -19,6 +21,11 @@ ARCILATOR_ARGS ?= --mlir-timing --print-debug-info
 VERILATOR_ARGS ?= -DPRINTF_COND=0 -DASSERT_VERBOSE_COND=0 -DSTOP_COND=0
 
 TRACE ?= 0
+RUN_ESSENT ?= 0
+
+ifeq ($(RUN_ESSENT),1)
+	CXXFLAGS += -DRUN_ESSENT
+endif
 
 ifeq ($(TRACE),1)
 	ARCILATOR_ARGS += --observe-wires --observe-ports --observe-named-values
@@ -58,21 +65,38 @@ $(BUILD_MODEL).sv: $(BUILD_MODEL).mlir
 	firtool --lowering-options=disallowLocalVariables $< -o $@
 
 $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h &: $(BUILD_MODEL).sv $(REPO_ROOT)/verilator-stubs.sv
-	verilator --public -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS)
+	verilator --public -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -O3 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS)
 	cp $(BUILD_MODEL)-vtor/Vrocket__ALL.a $(BUILD_MODEL)-vtor.a
 	cp $(BUILD_MODEL)-vtor/Vrocket.h $(BUILD_MODEL)-vtor.h
+
+#===-------------------------------------------------------------------------===
+# Essent
+#===-------------------------------------------------------------------------===
+
+$(BUILD_MODEL)-essent.h: $(BUILD_MODEL).fir
+	cd $(REPO_ROOT)/essent && sbt assembly
+	$(REPO_ROOT)/essent/utils/bin/essent -O3 --part-cutoff=8 --parallel=1 $(BUILD_MODEL).fir
+	mv $(BUILD_DIR)/RocketSystem.h $(BUILD_MODEL)-essent.h
 
 #===-------------------------------------------------------------------------===
 # Testbench
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL)-model-arc.o: $(SOURCE_MODEL)-model-arc.cpp $(SOURCE_MODEL)-model.h $(BUILD_MODEL)-arc.h
-	$(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -c $< -o $@
+	$(CXX) $(CXXFLAGS) -g -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -c $< -o $@
 
 $(BUILD_MODEL)-model-vtor.o: $(SOURCE_MODEL)-model-vtor.cpp $(SOURCE_MODEL)-model.h $(BUILD_MODEL)-vtor.h
-	$(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -I/$(VERILATOR_ROOT)/include -c $< -o $@
+	$(CXX) $(CXXFLAGS) -g -I$(BUILD_DIR) -I/$(VERILATOR_ROOT)/include -c $< -o $@
 
-$(BUILD_MODEL)-main: $(SOURCE_MODEL)-main.cpp $(BUILD_MODEL)-model-arc.o $(BUILD_MODEL)-arc.o $(BUILD_MODEL)-model-vtor.o $(BUILD_MODEL)-vtor.a $(VERILATOR_ROOT)/include/verilated.cpp $(VERILATOR_ROOT)/include/verilated_vcd_c.cpp $(VERILATOR_ROOT)/include/verilated_threads.cpp
+$(BUILD_MODEL)-model-essent.o: $(SOURCE_MODEL)-model-essent.cpp $(BUILD_MODEL)-essent.h $(SOURCE_MODEL)-model.h
+	$(CXX) $(CXXFLAGS) -g -I$(BUILD_DIR) -I$(REPO_ROOT)/essent-utils -fbracket-depth=1024 -c $< -o $@
+
+MAIN_DEP_LIST := $(SOURCE_MODEL)-main.cpp $(BUILD_MODEL)-model-arc.o $(BUILD_MODEL)-arc.o $(BUILD_MODEL)-model-vtor.o $(BUILD_MODEL)-vtor.a $(VERILATOR_ROOT)/include/verilated.cpp $(VERILATOR_ROOT)/include/verilated_vcd_c.cpp $(VERILATOR_ROOT)/include/verilated_threads.cpp
+ifeq ($(RUN_ESSENT),1)
+ MAIN_DEP_LIST += $(BUILD_MODEL)-model-essent.o
+endif
+
+$(BUILD_MODEL)-main: $(MAIN_DEP_LIST)
 	$(CXX) $(CXXFLAGS) -g -latomic -I$(REPO_ROOT)/elfio $^ -o $@
 
 #===-------------------------------------------------------------------------===
@@ -86,6 +110,8 @@ run-arcs: RUN_ARGS += --arcs
 run-arcs: run
 run-vtor: RUN_ARGS += --vtor
 run-vtor: run
+run-essent: RUN_ARGS += --essent
+run-essent: run
 run-trace: RUN_ARGS += --trace $(BUILD_MODEL).vcd
 run-trace: run
 
@@ -98,4 +124,4 @@ benchmark-vtor: RUN_ARGS += --vtor
 benchmark-vtor: benchmark
 
 hyperfine: $(BUILD_MODEL)-main
-	hyperfine --warmup=3 "$(BUILD_MODEL)-main $(BINARY) --arcs" "$(BUILD_MODEL)-main $(BINARY) --vtor"
+	hyperfine --show-output --warmup=3 "$(BUILD_MODEL)-main $(BINARY) --arcs" "$(BUILD_MODEL)-main $(BINARY) --vtor"

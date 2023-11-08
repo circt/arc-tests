@@ -1,0 +1,3 @@
+[submodule "essent"]
+	path = essent
+	url = git@github.com:maerhart/essent.git

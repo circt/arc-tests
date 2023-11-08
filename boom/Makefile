@@ -94,4 +94,4 @@ benchmark-vtor: RUN_ARGS += --vtor
 benchmark-vtor: benchmark
 
 hyperfine: $(BUILD_MODEL)-main
-	hyperfine --warmup=3 "$(BUILD_MODEL)-main $(BINARY) --arcs" "$(BUILD_MODEL)-main $(BINARY) --vtor"
+	hyperfine --show-output --warmup=3 "$(BUILD_MODEL)-main $(BINARY) --arcs" "$(BUILD_MODEL)-main $(BINARY) --vtor"

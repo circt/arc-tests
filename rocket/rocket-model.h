@@ -66,7 +66,7 @@ public:
 
   virtual void vcd_start(const char *outputFile) {}
   virtual void vcd_dump(size_t cycle) {}
-  virtual void eval() {}
+  virtual void eval(bool update = false) {}
   virtual Ports get_ports() { return {}; }
   virtual void set_clock(bool clock) {}
   virtual void set_reset(bool reset) {}
@@ -74,7 +74,7 @@ public:
   virtual AxiOutputs get_mem() { return {}; }
   virtual void set_mmio(AxiInputs &in) {}
   virtual AxiOutputs get_mmio() { return {}; }
-
+  
   const char *name = "unknown";
   std::chrono::high_resolution_clock::duration duration =
       std::chrono::high_resolution_clock::duration::zero();
@@ -82,3 +82,6 @@ public:
 
 std::unique_ptr<RocketModel> makeArcilatorModel();
 std::unique_ptr<RocketModel> makeVerilatorModel();
+#ifdef RUN_ESSENT
+std::unique_ptr<RocketModel> makeEssentModel();
+#endif
