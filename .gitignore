@@ -5,3 +5,7 @@
 *.log
 *.out
 build
+boom/generator/project
+boom/generator/target
+rocket/generator/rocket-chip-v1.4/
+rocket/generator/rocket-chip-v1.6/

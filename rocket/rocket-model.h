@@ -72,6 +72,8 @@ public:
   virtual void set_reset(bool reset) {}
   virtual void set_mem(AxiInputs &in) {}
   virtual AxiOutputs get_mem() { return {}; }
+  virtual void set_mmio(AxiInputs &in) {}
+  virtual AxiOutputs get_mmio() { return {}; }
 
   const char *name = "unknown";
   std::chrono::high_resolution_clock::duration duration =
