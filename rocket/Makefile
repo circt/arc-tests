@@ -19,6 +19,7 @@ BUILD_MODEL ?= $(BUILD_DIR)/rocket
 
 ARCILATOR_ARGS ?= --mlir-timing --print-debug-info
 VERILATOR_ARGS ?= -DPRINTF_COND=0 -DASSERT_VERBOSE_COND=0 -DSTOP_COND=0
+ESSENT_ARGS ?= -O3
 
 TRACE ?= 0
 RUN_ESSENT ?= 0
@@ -83,7 +84,7 @@ $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h &: $(BUILD_MODEL).sv $(REPO_ROOT)/ve
 
 $(BUILD_MODEL)-essent.h: $(BUILD_MODEL).fir
 	cd $(REPO_ROOT)/essent && sbt assembly
-	$(REPO_ROOT)/essent/utils/bin/essent -O3 --part-cutoff=8 --parallel=1 $(BUILD_MODEL).fir
+	$(REPO_ROOT)/essent/utils/bin/essent $(ESSENT_ARGS) $(BUILD_MODEL).fir
 	mv $(BUILD_DIR)/RocketSystem.h $(BUILD_MODEL)-essent.h
 
 #===-------------------------------------------------------------------------===
