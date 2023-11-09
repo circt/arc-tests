@@ -22,9 +22,17 @@ VERILATOR_ARGS ?= -DPRINTF_COND=0 -DASSERT_VERBOSE_COND=0 -DSTOP_COND=0
 
 TRACE ?= 0
 RUN_ESSENT ?= 0
+RUN_ARC ?= 1
+RUN_VTOR ?= 1
 
 ifeq ($(RUN_ESSENT),1)
 	CXXFLAGS += -DRUN_ESSENT
+endif
+ifeq ($(RUN_ARC),1)
+	CXXFLAGS += -DRUN_ARC
+endif
+ifeq ($(RUN_VTOR),1)
+	CXXFLAGS += -DRUN_VTOR
 endif
 
 ifeq ($(TRACE),1)
@@ -91,9 +99,15 @@ $(BUILD_MODEL)-model-vtor.o: $(SOURCE_MODEL)-model-vtor.cpp $(SOURCE_MODEL)-mode
 $(BUILD_MODEL)-model-essent.o: $(SOURCE_MODEL)-model-essent.cpp $(BUILD_MODEL)-essent.h $(SOURCE_MODEL)-model.h
 	$(CXX) $(CXXFLAGS) -g -I$(BUILD_DIR) -I$(REPO_ROOT)/essent-utils -fbracket-depth=1024 -c $< -o $@
 
-MAIN_DEP_LIST := $(SOURCE_MODEL)-main.cpp $(BUILD_MODEL)-model-arc.o $(BUILD_MODEL)-arc.o $(BUILD_MODEL)-model-vtor.o $(BUILD_MODEL)-vtor.a $(VERILATOR_ROOT)/include/verilated.cpp $(VERILATOR_ROOT)/include/verilated_vcd_c.cpp $(VERILATOR_ROOT)/include/verilated_threads.cpp
+MAIN_DEP_LIST := $(SOURCE_MODEL)-main.cpp
 ifeq ($(RUN_ESSENT),1)
- MAIN_DEP_LIST += $(BUILD_MODEL)-model-essent.o
+	MAIN_DEP_LIST += $(BUILD_MODEL)-model-essent.o
+endif
+ifeq ($(RUN_ARC),1)
+	MAIN_DEP_LIST += $(BUILD_MODEL)-model-arc.o $(BUILD_MODEL)-arc.o
+endif
+ifeq ($(RUN_VTOR),1)
+	MAIN_DEP_LIST += $(BUILD_MODEL)-model-vtor.o $(BUILD_MODEL)-vtor.a $(VERILATOR_ROOT)/include/verilated.cpp $(VERILATOR_ROOT)/include/verilated_vcd_c.cpp $(VERILATOR_ROOT)/include/verilated_threads.cpp
 endif
 
 $(BUILD_MODEL)-main: $(MAIN_DEP_LIST)
