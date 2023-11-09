@@ -1,7 +1,12 @@
 CXXFLAGS = -O3 -Wall -std=c++17 -no-pie
 VERILATOR_ROOT ?= $(shell verilator -getenv VERILATOR_ROOT)
 ARCILATOR_UTILS_ROOT ?= $(dir $(shell which arcilator))
-REPO_ROOT := ..
+
+mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
+mkfile_dir := $(dir $(mkfile_path))
+
+REPO_ROOT := $(mkfile_dir)..
+
 BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone.riscv
 CONFIG ?= small
 
@@ -15,6 +20,15 @@ ARCILATOR_ARGS ?= --mlir-timing --print-debug-info
 VERILATOR_ARGS ?= -DPRINTF_COND=0 -DASSERT_VERBOSE_COND=0 -DSTOP_COND=0
 
 TRACE ?= 0
+RUN_ARC ?= 1
+RUN_VTOR ?= 1
+
+ifeq ($(RUN_ARC),1)
+	CXXFLAGS += -DRUN_ARC
+endif
+ifeq ($(RUN_VTOR),1)
+	CXXFLAGS += -DRUN_VTOR
+endif
 
 ifeq ($(TRACE),1)
 	ARCILATOR_ARGS += --observe-wires --observe-ports --observe-named-values
@@ -68,7 +82,15 @@ $(BUILD_MODEL)-model-arc.o: $(SOURCE_MODEL)-model-arc.cpp $(SOURCE_MODEL)-model.
 $(BUILD_MODEL)-model-vtor.o: $(SOURCE_MODEL)-model-vtor.cpp $(SOURCE_MODEL)-model.h $(BUILD_MODEL)-vtor.h
 	$(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -I/$(VERILATOR_ROOT)/include -c $< -o $@
 
-$(BUILD_MODEL)-main: $(SOURCE_MODEL)-main.cpp $(BUILD_MODEL)-model-arc.o $(BUILD_MODEL)-arc.o $(BUILD_MODEL)-model-vtor.o $(BUILD_MODEL)-vtor.a $(VERILATOR_ROOT)/include/verilated.cpp $(VERILATOR_ROOT)/include/verilated_vcd_c.cpp $(VERILATOR_ROOT)/include/verilated_threads.cpp
+MAIN_DEP_LIST := $(SOURCE_MODEL)-main.cpp
+ifeq ($(RUN_ARC),1)
+	MAIN_DEP_LIST += $(BUILD_MODEL)-model-arc.o $(BUILD_MODEL)-arc.o
+endif
+ifeq ($(RUN_VTOR),1)
+	MAIN_DEP_LIST += $(BUILD_MODEL)-model-vtor.o $(BUILD_MODEL)-vtor.a $(VERILATOR_ROOT)/include/verilated.cpp $(VERILATOR_ROOT)/include/verilated_vcd_c.cpp $(VERILATOR_ROOT)/include/verilated_threads.cpp
+endif
+
+$(BUILD_MODEL)-main: $(MAIN_DEP_LIST)
 	$(CXX) $(CXXFLAGS) -g -latomic -I$(REPO_ROOT)/elfio $^ -o $@
 
 #===-------------------------------------------------------------------------===

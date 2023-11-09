@@ -78,6 +78,10 @@ public:
   const char *name = "unknown";
   std::chrono::high_resolution_clock::duration duration =
       std::chrono::high_resolution_clock::duration::zero();
+  std::chrono::high_resolution_clock::duration clock_time =
+      std::chrono::high_resolution_clock::duration::zero();
+  std::chrono::high_resolution_clock::duration passthrough_time =
+      std::chrono::high_resolution_clock::duration::zero();
 };
 
 std::unique_ptr<RocketModel> makeArcilatorModel();
