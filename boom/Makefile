@@ -37,13 +37,15 @@ RUN_VTOR ?= 1
 
 BENCHMARK_MODE ?= 0
 BENCHMARK_OUT_FILE ?= $(BUILD_DIR)/measurements-E$(RUN_ESSENT)A$(RUN_ARC)V$(RUN_VTOR)-$(shell date --iso=seconds).txt
-BENCHMARK_OUT_FILE := ${BENCHMARK_OUT_FILE}
+BENCHMARK_OUT_DIR := $(dir $(BENCHMARK_OUT_FILE))
+$(shell mkdir -p $(BENCHMARK_OUT_DIR))
+# BENCHMARK_OUT_FILE := ${BENCHMARK_OUT_FILE}
 
 BENCHMARK_PREFIX =
 BENCHMARK_SUFFIX =
 ifeq ($(BENCHMARK_MODE),1)
-	BENCHMARK_PREFIX += sudo chrt -f 99 perf stat -ddd 
-	BENCHMARK_SUFFIX += >> $(BENCHMARK_OUT_FILE) 2>&1
+	BENCHMARK_PREFIX += perf stat -ddd 
+	BENCHMARK_SUFFIX += 2>&1 | tee -a $(BENCHMARK_OUT_FILE) 
 endif
 
 ifeq ($(RUN_ARC),1)
@@ -90,14 +92,14 @@ $(BUILD_MODEL)-arc.o $(BUILD_MODEL).json &: $(BUILD_MODEL).mlir
 	echo "GROUP: arcilator SUBGROUP: arcilator COMMAND: arcilator $< --state-file=$(BUILD_MODEL).json -o $(BUILD_MODEL)-arc.ll $(ARCILATOR_ARGS)" $(BENCHMARK_SUFFIX)
 	$(BENCHMARK_PREFIX) $(ARCILATOR) $< --state-file=$(BUILD_MODEL).json -o $(BUILD_MODEL)-arc.ll $(ARCILATOR_ARGS) $(BENCHMARK_SUFFIX)
 	echo "GROUP: arcilator SUBGROUP: opt COMMAND: opt $(CXX_OPT_LEVEL) -S $(BUILD_MODEL)-arc.ll -o $(BUILD_MODEL)-llvm.ll" $(BENCHMARK_SUFFIX)
-	$(BENCHMARK_PREFIX) $(OPT) -O1 -S $(BUILD_MODEL)-arc.ll -o $(BUILD_MODEL)-llvm.ll $(BENCHMARK_SUFFIX)
+	$(BENCHMARK_PREFIX) $(OPT) $(CXX_OPT_LEVEL) -S $(BUILD_MODEL)-arc.ll -o $(BUILD_MODEL)-llvm.ll $(BENCHMARK_SUFFIX)
 	echo "GROUP: arcilator SUBGROUP: llc COMMAND: llc $(BUILD_MODEL)-llvm.ll -O3 --filetype=obj -o $(BUILD_MODEL)-arc.o" $(BENCHMARK_SUFFIX)
 	$(BENCHMARK_PREFIX) $(LLC) -O3 --filetype=obj $(BUILD_MODEL)-llvm.ll -o $(BUILD_MODEL)-arc.o $(BENCHMARK_SUFFIX)
 	objdump -d $(BUILD_MODEL)-arc.o > $(BUILD_MODEL)-arc.s
 
 $(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
-	echo "GROUP: arcilator SUBGROUP: arcilator COMMAND: python3 $(ARCILATOR_UTILS_ROOT)/arcilator-header-cpp.py $< --view-depth 1 > $@" $(BENCHMARK_SUFFIX)
-	$(BENCHMARK_PREFIX) python3 $(ARCILATOR_UTILS_ROOT)/arcilator-header-cpp.py $< --view-depth 1 > $@ $(BENCHMARK_SUFFIX)
+#	echo "GROUP: arcilator SUBGROUP: arcilator COMMAND: python3 $(ARCILATOR_UTILS_ROOT)/arcilator-header-cpp.py $< --view-depth 1 > $@" $(BENCHMARK_SUFFIX)
+	python3 $(ARCILATOR_UTILS_ROOT)/arcilator-header-cpp.py $< --view-depth 1 > $@
 
 #===-------------------------------------------------------------------------===
 # Verilator
@@ -109,7 +111,7 @@ $(BUILD_MODEL).sv: $(BUILD_MODEL).fir
 
 $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h &: $(BUILD_MODEL).sv $(REPO_ROOT)/verilator-stubs.sv
 	echo "GROUP: verilator SUBGROUP: verilator COMMAND: verilator --public -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -O3 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS)" $(BENCHMARK_SUFFIX)
-	$(BENCHMARK_PREFIX) $(VERILATOR) -O3 --public -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS) $(BENCHMARK_SUFFIX)
+	$(BENCHMARK_PREFIX) $(VERILATOR) -O3 --threads 1 --public -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS) $(BENCHMARK_SUFFIX)
 	cp $(BUILD_MODEL)-vtor/Vboom__ALL.a $(BUILD_MODEL)-vtor.a
 	cp $(BUILD_MODEL)-vtor/Vboom.h $(BUILD_MODEL)-vtor.h
 

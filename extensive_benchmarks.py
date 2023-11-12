@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 
-from enum import Enum
+from enum import IntEnum
 import string
-import os.system;
-import re;
+import subprocess
 
-class Simulator(Enum):
+class Simulator(IntEnum):
     Arcilator = 0
     Verilator = 1
     Essent = 2
@@ -18,7 +17,7 @@ class Simulator(Enum):
         elif self == Simulator.Essent:
             return "essent"
 
-class Design(Enum):
+class Design(IntEnum):
     BoomSmall = 0
     BoomMedium = 1
     BoomLarge = 2
@@ -71,10 +70,10 @@ class Design(Enum):
             return "dual-large-v1.6"
 
     def is_rocket_v14(self) -> bool:
-        return self >= 4 and self < 10
+        return int(self) >= 4 and int(self) < 10
 
     def is_rocket_v16(self) -> bool:
-        return self >= 10
+        return int(self) >= 10
 
     def is_rocket(self) -> bool:
         return self.is_rocket_v14() or self.is_rocket_v16()
@@ -83,7 +82,7 @@ class Design(Enum):
         return not self.is_rocket()
 
     def is_dual_core(self) -> bool:
-        return (self.is_rocket_v14() and self >= 7) or (self.is_rocket_v16() and self >= 13)
+        return (self.is_rocket_v14() and int(self) >= 7) or (self.is_rocket_v16() and int(self) >= 13)
 
     def is_single_core(self) -> bool:
         return not self.is_single_core()
@@ -108,36 +107,13 @@ def invoke_make(config: Config, action: string, measurement_file: string, build_
     run_verilator = "1" if simulator == Simulator.Verilator else "0"
 
     # Build the benchmark
-    os.system(f'time make -C {rocket_or_boom} {action} CXX_OPT_LEVEL={cxx_opt_level} BUILD_DIR={build_dir} CONFIG={design.to_string()} ARCILATOR_ARGS="{config.options}" ESSENT_ARGS="{config.options}" RUN_ESSENT={run_essent} RUN_ARC={run_arcilator} RUN_VTOR={run_verilator}')
-
-    # Rocket v1.6:
-    # [done] Arcilator O3 with and without deduplication, both sim perf and compile time
-    # [done] Arcilator O3 with and without LUTs, both sim perf and compile time
-    # [done] Arcilator O0 and dedup disabled, sim perf
-    # [done] Arcilator O1 (only canonicalizer and CSE) and dedup disabled, sim perf
-    # [done] Verilator
-    # [done] Arcilator O3, Verilator binary size
-    # [done] Arcilator O3, Verilator compile time
-
-    # Boom:
-    # [done] Verilator, clang O3
-    # [done] Arcilator O3, clang O3
-    # [done] Arcilator O3, Verilator binary size
-    # [done] Arcilator O3, Verilator compile time
-
-    # Rocket v1.4:
-    # [done] Essent O0, O2, O3, clang O3
-    # [done] Verilator, clang O3
-    # [done] Arcilator O3, clang O3
-    # [done] Arcilator O3, Verilator, Essent O3 with clang -Os
-    # [done] Arcilator O3, Essent O3, Verilator binary size
-    # [done] Arcilator O3, Verilator, Essent O3 compile time
+    subprocess.call(f'time make -C {rocket_or_boom} {action} BENCHMARK_OUT_FILE={measurement_file} BENCHMARK_MODE=1 CXX_OPT_LEVEL={cxx_opt_level} BUILD_DIR={build_dir} CONFIG={design.to_string()} ARCILATOR_ARGS="{config.options}" ESSENT_ARGS="{config.options}" RUN_ESSENT={run_essent} RUN_ARC={run_arcilator} RUN_VTOR={run_verilator}', shell=True)
 
 boom_designs = [
-    Design.BoomSmall,
-    Design.BoomMedium,
-    Design.BoomLarge,
     Design.BoomMega,
+    Design.BoomLarge,
+    Design.BoomMedium,
+    Design.BoomSmall,
 ]
 
 rocket14_designs = [
@@ -158,47 +134,32 @@ rocket16_designs = [
     Design.RocketDualLarge16,
 ]
 
-all_designs = boom_designs ++ rocket14_designs ++ rocket16_designs
+all_designs = boom_designs + rocket14_designs + rocket16_designs
 
 def collect_binary_size():
-    for design in all_designs:
+    for design in [Design.RocketLarge14, Design.RocketLarge16]:
         config = Config(Simulator.Arcilator, design, "--mlir-timing -O3")
-        os.system(f'mkdir -p ./measurements/{config.sim.to_string()}-{design.to_string()}')
-        os.system(f'mkdir -p ./build/{config.sim.to_string()}-{design.to_string()}-binary-size/')
         invoke_make(config, "binary-size", f'./measurements/{config.sim.to_string()}-{design.to_string()}/binary-size.txt', f'./build/{config.sim.to_string()}-{design.to_string()}-binary-size/')
         config = Config(Simulator.Verilator, design, "-O3")
-        os.system(f'mkdir -p ./measurements/{config.sim.to_string()}-{design.to_string()}')
-        os.system(f'mkdir -p ./build/{config.sim.to_string()}-{design.to_string()}-binary-size/')
         invoke_make(config, "binary-size", f'./measurements/{config.sim.to_string()}-{design.to_string()}/binary-size.txt', f'./build/{config.sim.to_string()}-{design.to_string()}-binary-size/')
 
     for design in rocket14_designs:
         config = Config(Simulator.Essent, design, "-O3")
-        os.system(f'mkdir -p ./measurements/{config.sim.to_string()}-{design.to_string()}')
-        os.system(f'mkdir -p ./build/{config.sim.to_string()}-{design.to_string()}-binary-size/')
         invoke_make(config, "binary-size", f'./measurements/{config.sim.to_string()}-{design.to_string()}/binary-size.txt', f'./build/{config.sim.to_string()}-{design.to_string()}-binary-size/')
 
-
-# def extract_measurements(output_file_name):
-#     re.search(r'START:')
-#     re.search(r'GROUP: arcilator SUBGROUP: firtool')
-#     re.search(r'seconds time elapsed')
-#     re.search(r'END:')
-
 def benchmark_compile_time(config: Config, uniquifier: string):
-    os.system(f'mkdir -p ./measurements/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}')
+    subprocess.call(f'mkdir -p ./measurements/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}', shell=True)
 
     # Warmup
     for i in range(3):
         measurement_file = f'./measurements/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}/compile-time-warmup-{i}.txt'
         build_dir = f'./build/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}-compile-time-warmup-{i}/'
-        os.system(f'mkdir -p {build_dir}')
         invoke_make(config, "build", measurement_file, build_dir)
 
-    # Runs
+    # Runr
     for i in range(10):
         measurement_file = f'./measurements/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}/compile-time-run-{i}.txt'
         build_dir = f'./build/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}-compile-time-run-{i}/'
-        os.system(f'mkdir -p {build_dir}')
         invoke_make(config, "build", measurement_file, build_dir)
 
 def benchmark_compile_time_all():
@@ -211,28 +172,21 @@ def benchmark_compile_time_all():
         benchmark_compile_time(Config(Simulator.Verilator, design, "-O3"), "O3")
 
     for design in rocket14_designs:
-        benchmark_compile_time(Config(Simulator.Essent, design, "-O0"), "O0")
-        benchmark_compile_time(Config(Simulator.Essent, design, "-O2"), "O2")
         benchmark_compile_time(Config(Simulator.Essent, design, "-O3"), "O3")
-        benchmark_compile_time(Config(Simulator.Essent, design, "-O3"), "Os", "-Os")
-        benchmark_compile_time(Config(Simulator.Arcilator, design, "-O3"), "Os", "-Os")
-        benchmark_compile_time(Config(Simulator.Verilator, design, "-O3"), "Os", "-Os")
 
 def benchmark_simulation_performance(config: Config, uniquifier: string, cxx_opt_level = "-O3"):
     measurement_file = f'./measurements/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}/sim-perf.txt'
     build_dir = f'./build/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}-simperf/'
-    os.system(f'mkdir -p ./measurements/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}')
-    os.system(f'mkdir -p ./build/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}-simperf/')
     invoke_make(config, "build", measurement_file, build_dir, cxx_opt_level)
     rocket_or_boom = "rocket" if config.design.is_rocket() else "boom"
 
     # Warmup
     for i in range(3):
-        os.system(f'sudo chrt -f 99 perf stat -ddd {build_dir}{rocket_or_boom}-main benchmarks/dhrystone.riscv >>{measurement_file} 2>&1')
+        subprocess.call(f'perf stat -ddd {rocket_or_boom}/{build_dir}{rocket_or_boom}-main benchmarks/dhrystone.riscv 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
 
     # Runs
     for i in range(10):
-        os.system(f'sudo chrt -f 99 perf stat -ddd {build_dir}{rocket_or_boom}-main benchmarks/dhrystone.riscv >>{measurement_file} 2>&1')
+        subprocess.call(f'perf stat -ddd {rocket_or_boom}/{build_dir}{rocket_or_boom}-main benchmarks/dhrystone.riscv 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
 
 def benchmark_simulation_performance_all():
     for design in rocket16_designs:
@@ -246,7 +200,11 @@ def benchmark_simulation_performance_all():
         benchmark_simulation_performance(Config(Simulator.Verilator, design, "-O3"), "O3")
 
     for design in rocket14_designs:
-        benchmark_simulation_performance(Config(Simulator.Essent, design, "-O3"), "O3")
+        benchmark_simulation_performance(Config(Simulator.Essent, design, "-O0"), "O0")
+        benchmark_simulation_performance(Config(Simulator.Essent, design, "-O2"), "O2")
+        benchmark_simulation_performance(Config(Simulator.Essent, design, "-O3"), "Os", "-Os")
+        benchmark_simulation_performance(Config(Simulator.Arcilator, design, "-O3"), "Os", "-Os")
+        benchmark_simulation_performance(Config(Simulator.Verilator, design, "-O3"), "Os", "-Os")
 
 if __name__ == "__main__":
     print("//----------------------------------------------//")
