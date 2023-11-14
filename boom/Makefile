@@ -25,10 +25,10 @@ BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone.riscv
 CONFIG ?= small
 
 BUILD_DIR ?= build/$(CONFIG)
-$(shell mkdir -p $(BUILD_DIR))
+$(shell mkdir -p ${mkfile_dir}/$(BUILD_DIR))
 
 SOURCE_MODEL ?= boom
-BUILD_MODEL ?= $(BUILD_DIR)/boom
+BUILD_MODEL ?= ${mkfile_dir}/$(BUILD_DIR)/boom
 
 ARCILATOR_ARGS ?= --mlir-timing --print-debug-info
 VERILATOR_ARGS ?= -DPRINTF_COND=0 -DASSERT_VERBOSE_COND=0 -DSTOP_COND=0 -Wno-WIDTH
@@ -38,16 +38,15 @@ RUN_ARC ?= 1
 RUN_VTOR ?= 1
 
 BENCHMARK_MODE ?= 0
-BENCHMARK_OUT_FILE ?= $(BUILD_DIR)/measurements-E$(RUN_ESSENT)A$(RUN_ARC)V$(RUN_VTOR)-$(shell date --iso=seconds).txt
+BENCHMARK_OUT_FILE ?= ${mkfile_dir}/$(BUILD_DIR)/measurements-E$(RUN_ESSENT)A$(RUN_ARC)V$(RUN_VTOR)-$(shell date --iso=seconds).txt
 BENCHMARK_OUT_DIR := $(dir $(BENCHMARK_OUT_FILE))
 $(shell mkdir -p $(BENCHMARK_OUT_DIR))
-# BENCHMARK_OUT_FILE := ${BENCHMARK_OUT_FILE}
 
 BENCHMARK_PREFIX =
 BENCHMARK_SUFFIX =
 ifeq ($(BENCHMARK_MODE),1)
 	BENCHMARK_PREFIX += perf stat -ddd 
-	BENCHMARK_SUFFIX += 2>&1 | tee -a $(BENCHMARK_OUT_FILE) 
+	BENCHMARK_SUFFIX += 2>&1 | tee -a ${mkfile_dir}/$(BENCHMARK_OUT_FILE) 
 endif
 
 ifeq ($(RUN_ARC),1)
@@ -119,7 +118,7 @@ $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h &: $(BUILD_MODEL).sv $(REPO_ROOT)/ve
 	echo "GROUP: verilator SUBGROUP: clang" $(BENCHMARK_SUFFIX)
 	cd $(BUILD_MODEL)-vtor/ && $(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) $(VERILATOR_CPP_FLAGS) -c -I/$(VERILATOR_ROOT)/include *.cpp $(BENCHMARK_SUFFIX)
 	echo "GROUP: verilator SUBGROUP: ar" $(BENCHMARK_SUFFIX)
-	cd $(BUILD_MODEL)-vtor/ && $(BENCHMARK_PREFIX) $(AR) -rcs $(BUILD_MODEL)-vtor.a *.o $(BENCHMARK_SUFFIX)
+	cd $(BUILD_MODEL)-vtor/ && $(BENCHMARK_PREFIX) $(AR) rcs $(BUILD_MODEL)-vtor.a *.o $(BENCHMARK_SUFFIX)
 	cp $(BUILD_MODEL)-vtor/Vboom.h $(BUILD_MODEL)-vtor.h
 
 #===-------------------------------------------------------------------------===
@@ -127,12 +126,12 @@ $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h &: $(BUILD_MODEL).sv $(REPO_ROOT)/ve
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL)-model-arc.o: $(SOURCE_MODEL)-model-arc.cpp $(SOURCE_MODEL)-model.h $(BUILD_MODEL)-arc.h
-	echo "GROUP: arcilator SUBGROUP: clang COMMAND: $(CXX) $(CXXFLAGS) -g -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -c $< -o $@" $(BENCHMARK_SUFFIX)
-	$(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -c $< -o $@ $(BENCHMARK_SUFFIX)
+	echo "GROUP: arcilator SUBGROUP: clang COMMAND: $(CXX) $(CXXFLAGS) -g -I$(ARCILATOR_UTILS_ROOT)/ -I${mkfile_dir}/$(BUILD_DIR) -c $< -o $@" $(BENCHMARK_SUFFIX)
+	$(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I${mkfile_dir}/$(BUILD_DIR) -c $< -o $@ $(BENCHMARK_SUFFIX)
 
 $(BUILD_MODEL)-model-vtor.o: $(SOURCE_MODEL)-model-vtor.cpp $(SOURCE_MODEL)-model.h $(BUILD_MODEL)-vtor.h
-	echo "GROUP: verilator SUBGROUP: clang COMMAND: $(CXX) $(CXXFLAGS) -g -I$(BUILD_DIR) -I/$(VERILATOR_ROOT)/include -c $< -o $@" $(BENCHMARK_SUFFIX)
-	$(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -I/$(VERILATOR_ROOT)/include -c $< -o $@ $(BENCHMARK_SUFFIX)
+	echo "GROUP: verilator SUBGROUP: clang COMMAND: $(CXX) $(CXXFLAGS) -g -I${mkfile_dir}/$(BUILD_DIR) -I/$(VERILATOR_ROOT)/include -c $< -o $@" $(BENCHMARK_SUFFIX)
+	$(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I${mkfile_dir}/$(BUILD_DIR) -I/$(VERILATOR_ROOT)/include -c $< -o $@ $(BENCHMARK_SUFFIX)
 
 MAIN_DEP_LIST := $(SOURCE_MODEL)-main.cpp
 ifeq ($(RUN_ARC),1)
@@ -151,7 +150,7 @@ $(BUILD_MODEL)-main: $(MAIN_DEP_LIST)
 #===-------------------------------------------------------------------------===
 
 binary-size: $(BUILD_MODEL)-main
-	ls -al $(BUILD_DIR) $(BENCHMARK_SUFFIX)
+	ls -al ${mkfile_dir}/$(BUILD_DIR) $(BENCHMARK_SUFFIX)
 
 build: $(BUILD_MODEL)-main
 	echo "END: Current timestamp in milliseconds: ${shell date +%s%3N}" $(BENCHMARK_SUFFIX)
