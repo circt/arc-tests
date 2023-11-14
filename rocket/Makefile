@@ -1,5 +1,5 @@
 CXX_OPT_LEVEL ?= -O3
-CXXFLAGS = $(CXX_OPT_LEVEL) -Wall -std=c++17 -no-pie
+CXXFLAGS = $(CXX_OPT_LEVEL) -std=c++17 -no-pie
 VERILATOR_ROOT ?= $(shell verilator -getenv VERILATOR_ROOT)
 ARCILATOR_UTILS_ROOT ?= $(dir $(shell which arcilator))
 
@@ -18,6 +18,8 @@ OPT ?= $(shell which opt)
 OPT := ${OPT}
 LLC ?= $(shell which llc)
 LLC := ${LLC}
+AR ?= $(shell which ar)
+AR := ${AR}
 
 BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone.riscv
 CONFIG ?= small
@@ -30,7 +32,7 @@ SOURCE_MODEL ?= $(SOURCE_DIR)/rocket
 BUILD_MODEL ?= $(BUILD_DIR)/rocket
 
 ARCILATOR_ARGS ?= --mlir-timing --print-debug-info
-VERILATOR_ARGS ?= -DPRINTF_COND=0 -DASSERT_VERBOSE_COND=0 -DSTOP_COND=0
+VERILATOR_ARGS ?= -DPRINTF_COND=0 -DASSERT_VERBOSE_COND=0 -DSTOP_COND=0 -Wno-WIDTH
 ESSENT_ARGS ?= -O3
 
 TRACE ?= 0
@@ -115,10 +117,15 @@ $(BUILD_MODEL).sv: $(BUILD_MODEL).fir
 	echo "GROUP: verilator SUBGROUP: firtool COMMAND: firtool --lowering-options=disallowLocalVariables $< -o $@" $(BENCHMARK_SUFFIX)
 	$(BENCHMARK_PREFIX) $(FIRTOOL) --lowering-options=disallowLocalVariables $< -o $@ $(BENCHMARK_SUFFIX)
 
+VERILATOR_CPP_FLAGS = -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-sign-compare -Wno-uninitialized -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable -Wno-shadow -DVL_TIME_CONTEXT
+
 $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h &: $(BUILD_MODEL).sv $(REPO_ROOT)/verilator-stubs.sv
-	echo "GROUP: verilator SUBGROUP: verilator COMMAND: verilator --public -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -O3 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS)" $(BENCHMARK_SUFFIX)
-	$(BENCHMARK_PREFIX) $(VERILATOR) --threads 1 --public -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -O3 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS) $(BENCHMARK_SUFFIX)
-	cp $(BUILD_MODEL)-vtor/Vrocket__ALL.a $(BUILD_MODEL)-vtor.a
+	echo "GROUP: verilator SUBGROUP: verilator" $(BENCHMARK_SUFFIX)
+	$(BENCHMARK_PREFIX) $(VERILATOR) -O3 --noassert --x-assign fast --x-initial fast --threads 1 -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ -j 0 $(VERILATOR_ARGS) $(BENCHMARK_SUFFIX)
+	echo "GROUP: verilator SUBGROUP: clang" $(BENCHMARK_SUFFIX)
+	cd $(BUILD_MODEL)-vtor/ && $(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) $(VERILATOR_CPP_FLAGS) -c -I/$(VERILATOR_ROOT)/include *.cpp $(BENCHMARK_SUFFIX)
+	echo "GROUP: verilator SUBGROUP: ar" $(BENCHMARK_SUFFIX)
+	cd $(BUILD_MODEL)-vtor/ && $(BENCHMARK_PREFIX) $(AR) -rcs $(BUILD_MODEL)-vtor.a *.o $(BENCHMARK_SUFFIX)
 	cp $(BUILD_MODEL)-vtor/Vrocket.h $(BUILD_MODEL)-vtor.h
 
 #===-------------------------------------------------------------------------===

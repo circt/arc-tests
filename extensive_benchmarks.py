@@ -148,24 +148,22 @@ def collect_binary_size():
         invoke_make(config, "binary-size", f'./measurements/{config.sim.to_string()}-{design.to_string()}/binary-size.txt', f'./build/{config.sim.to_string()}-{design.to_string()}-binary-size/')
 
 def benchmark_compile_time(config: Config, uniquifier: string):
-    subprocess.call(f'mkdir -p ./measurements/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}', shell=True)
-
     # Warmup
     for i in range(3):
         measurement_file = f'./measurements/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}/compile-time-warmup-{i}.txt'
         build_dir = f'./build/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}-compile-time-warmup-{i}/'
         invoke_make(config, "build", measurement_file, build_dir)
 
-    # Runr
+    # Run
     for i in range(10):
         measurement_file = f'./measurements/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}/compile-time-run-{i}.txt'
         build_dir = f'./build/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}-compile-time-run-{i}/'
         invoke_make(config, "build", measurement_file, build_dir)
 
 def benchmark_compile_time_all():
-    for design in rocket16_designs:
-        benchmark_compile_time(Config(Simulator.Arcilator, design, "-O3 --dedup=0"), "O3-nodedup")
-        benchmark_compile_time(Config(Simulator.Arcilator, design, "-O3 --lookup-tables=0"), "O3-nolut")
+    # for design in rocket16_designs:
+    #     benchmark_compile_time(Config(Simulator.Arcilator, design, "-O3 --dedup=0"), "O3-nodedup")
+    #     benchmark_compile_time(Config(Simulator.Arcilator, design, "-O3 --lookup-tables=0"), "O3-nolut")
 
     for design in all_designs:
         benchmark_compile_time(Config(Simulator.Arcilator, design, "-O3"), "O3")
@@ -190,21 +188,21 @@ def benchmark_simulation_performance(config: Config, uniquifier: string, cxx_opt
 
 def benchmark_simulation_performance_all():
     for design in rocket16_designs:
-        benchmark_simulation_performance(Config(Simulator.Arcilator, design, "-O3 --dedup=0"), "O3-nodedup")
-        benchmark_simulation_performance(Config(Simulator.Arcilator, design, "-O0 --dedup=0"), "O0-nodedup")
-        benchmark_simulation_performance(Config(Simulator.Arcilator, design, "-O1 --dedup=0"), "O1-nodedup")
-        benchmark_simulation_performance(Config(Simulator.Arcilator, design, "-O3 --lookup-tables=0"), "O3-nolut")
+        # benchmark_simulation_performance(Config(Simulator.Arcilator, design, "-O3 --dedup=0"), "O3-nodedup")
+        benchmark_simulation_performance(Config(Simulator.Arcilator, design, "-O0 --dedup=0 --inline=0"), "O0-nodedup-noinline")
+        # benchmark_simulation_performance(Config(Simulator.Arcilator, design, "-O1 --dedup=0"), "O1-nodedup")
+        # benchmark_simulation_performance(Config(Simulator.Arcilator, design, "-O3 --lookup-tables=0"), "O3-nolut")
 
     for design in all_designs:
         benchmark_simulation_performance(Config(Simulator.Arcilator, design, "-O3"), "O3")
         benchmark_simulation_performance(Config(Simulator.Verilator, design, "-O3"), "O3")
 
     for design in rocket14_designs:
-        benchmark_simulation_performance(Config(Simulator.Essent, design, "-O0"), "O0")
+        benchmark_simulation_performance(Config(Simulator.Essent, design, "-O3"), "O3")
         benchmark_simulation_performance(Config(Simulator.Essent, design, "-O2"), "O2")
-        benchmark_simulation_performance(Config(Simulator.Essent, design, "-O3"), "Os", "-Os")
-        benchmark_simulation_performance(Config(Simulator.Arcilator, design, "-O3"), "Os", "-Os")
-        benchmark_simulation_performance(Config(Simulator.Verilator, design, "-O3"), "Os", "-Os")
+        # benchmark_simulation_performance(Config(Simulator.Essent, design, "-O3"), "Os", "-Os")
+        # benchmark_simulation_performance(Config(Simulator.Arcilator, design, "-O3"), "Os", "-Os")
+        # benchmark_simulation_performance(Config(Simulator.Verilator, design, "-O3"), "Os", "-Os")
 
 if __name__ == "__main__":
     print("//----------------------------------------------//")
