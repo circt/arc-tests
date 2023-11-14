@@ -129,8 +129,9 @@ for signal, signame1, signame2 in common_signals:
                 tv = tv[1:]
         return tv
 
-    tv1 = skip_time(signal1.tv)
-    tv2 = skip_time(signal2.tv)
+    endtime = max(signal1.endtime, signal2.endtime)
+    tv1 = skip_time(signal1.tv + [(endtime, signal1.tv[-1][1])])
+    tv2 = skip_time(signal2.tv + [(endtime, signal2.tv[-1][1])])
     for (t1, v1), (t2, v2) in zip(tv1, tv2):
         if t1 == t2 and v1 == v2:
             continue
