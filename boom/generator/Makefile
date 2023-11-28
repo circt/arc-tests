@@ -23,6 +23,9 @@ large: ../boom-large.fir.gz
 mega: CONFIG=MegaConfig
 mega: ../boom-mega.fir.gz
 
+giga: CONFIG=GigaConfig
+giga: ../boom-giga.fir.gz
+
 ../boom-%.fir.gz: arc.scala bootrom.rv64.img
 	mkdir -p build
 	sbt "runMain freechips.rocketchip.system.Generator -td build -T arc.BoomSystem -C arc.$(CONFIG)"
