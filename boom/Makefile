@@ -11,17 +11,17 @@ $(shell mkdir -p $(BUILD_DIR))
 SOURCE_MODEL ?= boom
 BUILD_MODEL ?= $(BUILD_DIR)/boom
 
-ARCILATOR_ARGS ?= --mlir-timing --print-debug-info
+ARCILATOR_ARGS ?= --mlir-timing --print-debug-info --mlir-pass-statistics
 VERILATOR_ARGS ?= -DPRINTF_COND=0 -DASSERT_VERBOSE_COND=0 -DSTOP_COND=0
 
 TRACE ?= 0
 
 ifeq ($(TRACE),1)
-	ARCILATOR_ARGS += --observe-wires --observe-ports --observe-named-values
+	ARCILATOR_ARGS += --observe-wires --observe-ports --observe-named-values --observe-registers --observe-memories
 	VERILATOR_ARGS += --trace --trace-underscore
 	CXXFLAGS += -DTRACE
 else
-	ARCILATOR_ARGS += --observe-wires=0 --observe-ports=0 --observe-named-values=0
+	ARCILATOR_ARGS += --observe-wires=0 --observe-ports=0 --observe-named-values=0 --observe-registers=0 --observe-memories=0
 endif
 
 #===-------------------------------------------------------------------------===
@@ -54,7 +54,7 @@ $(BUILD_MODEL).sv: $(BUILD_MODEL).mlir
 	firtool --lowering-options=disallowLocalVariables,mitigateVivadoArrayIndexConstPropBug $< -o $@
 
 $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h &: $(BUILD_MODEL).sv $(REPO_ROOT)/verilator-stubs.sv
-	verilator -O3 --public -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS)
+	verilator -O3 -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS)
 	cp $(BUILD_MODEL)-vtor/Vboom__ALL.a $(BUILD_MODEL)-vtor.a
 	cp $(BUILD_MODEL)-vtor/Vboom.h $(BUILD_MODEL)-vtor.h
 

@@ -1,31 +1,28 @@
 CXXFLAGS = -O3 -Wall -std=c++17 -no-pie
 VERILATOR_ROOT ?= $(shell verilator -getenv VERILATOR_ROOT)
-
 mkfile_path := $(dir $(MAKEFILE_LIST))
-REPO_ROOT := $(mkfile_path)/..
-
+REPO_ROOT := ..
 ARCILATOR_UTILS_ROOT ?= $(dir $(shell which arcilator))
 BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone.riscv
-CONFIG ?= small
+CONFIG ?= small-v1.6
 
-SOURCE_DIR ?= $(mkfile_path)
-BUILD_DIR ?= $(REPO_ROOT)/build/rocket-$(CONFIG)
+BUILD_DIR ?= build/$(CONFIG)
 $(shell mkdir -p $(BUILD_DIR))
 
-SOURCE_MODEL ?= $(SOURCE_DIR)/rocket
+SOURCE_MODEL ?= rocket
 BUILD_MODEL ?= $(BUILD_DIR)/rocket
 
-ARCILATOR_ARGS ?= --mlir-timing --print-debug-info
+ARCILATOR_ARGS ?= --mlir-timing --print-debug-info --mlir-pass-statistics
 VERILATOR_ARGS ?= -DPRINTF_COND=0 -DASSERT_VERBOSE_COND=0 -DSTOP_COND=0
 
 TRACE ?= 0
 
 ifeq ($(TRACE),1)
-	ARCILATOR_ARGS += --observe-wires --observe-ports --observe-named-values
+	ARCILATOR_ARGS += --observe-wires --observe-ports --observe-named-values --observe-registers --observe-memories
 	VERILATOR_ARGS += --trace --trace-underscore
 	CXXFLAGS += -DTRACE
 else
-	ARCILATOR_ARGS += --observe-wires=0 --observe-ports=0 --observe-named-values=0
+	ARCILATOR_ARGS += --observe-wires=0 --observe-ports=0 --observe-named-values=0 --observe-registers=0 --observe-memories=0
 endif
 
 #===-------------------------------------------------------------------------===
@@ -58,7 +55,7 @@ $(BUILD_MODEL).sv: $(BUILD_MODEL).mlir
 	firtool --lowering-options=disallowLocalVariables $< -o $@
 
 $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h &: $(BUILD_MODEL).sv $(REPO_ROOT)/verilator-stubs.sv
-	verilator --public -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS)
+	verilator -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS)
 	cp $(BUILD_MODEL)-vtor/Vrocket__ALL.a $(BUILD_MODEL)-vtor.a
 	cp $(BUILD_MODEL)-vtor/Vrocket.h $(BUILD_MODEL)-vtor.h
 
