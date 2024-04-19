@@ -225,4 +225,4 @@ tohost: .dword 0
 fromhost: .dword 0
 .align 6
 .globl tohost_data
-tohost_data: .byte 256
+tohost_data: .zero 64

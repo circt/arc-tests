@@ -9,7 +9,7 @@
 #include "util.h"
 
 #define SYS_write 64
-#define TOHOST_DATA_SIZE 256
+#define TOHOST_DATA_SIZE 64
 
 #undef strcmp
 
@@ -129,7 +129,7 @@ void _init(int cid, int nc)
 #undef putchar
 int putchar(int ch)
 {
-  static __thread char buf[64] __attribute__((aligned(64)));
+  static __thread char buf[TOHOST_DATA_SIZE] __attribute__((aligned(64)));
   static __thread int buflen = 0;
 
   buf[buflen++] = ch;

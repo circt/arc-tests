@@ -10,7 +10,7 @@
 #define TOHOST_ADDR 0x60000000
 #define FROMHOST_ADDR 0x60000040
 #define TOHOST_DATA_ADDR 0x60000080
-#define TOHOST_DATA_SIZE 256 // bytes
+#define TOHOST_DATA_SIZE 64 // bytes
 #define SYS_write 64
 
 static bool finished = false;
@@ -348,8 +348,8 @@ int main(int argc, char **argv) {
       }
 
       if (data == SYS_write) {
-        for (int i = 0; i < 2000; i += 8) {
-          uint64_t data = memory[TOHOST_DATA_ADDR + i * 8];
+        for (int i = 0; i < TOHOST_DATA_SIZE; i += 8) {
+          uint64_t data = memory[TOHOST_DATA_ADDR + i];
           unsigned char c[8];
           *(uint64_t*) c = data;
           for (int k = 0; k < 8; ++k) {
