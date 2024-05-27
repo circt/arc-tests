@@ -30,7 +30,7 @@ endif
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL).fir: $(SOURCE_MODEL)-$(CONFIG).fir.gz
-	gzip -dc $< > $@
+	gzip -dc $< | sed 's/printf.*/skip/' > $@
 
 $(BUILD_MODEL).mlir: $(BUILD_MODEL).fir
 	firtool --ir-hw $< -o $@
