@@ -5,5 +5,7 @@
 /build
 /lib
 /project
-/rocket-chip
+/out
+/rocket-chip*
 /target
+/mill

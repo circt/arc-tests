@@ -1,5 +1,5 @@
 ROCKET_URL ?= https://github.com/chipsalliance/rocket-chip.git
-ROCKET_TAG ?= v1.6
+ROCKET_TAG ?= master
 
 all: bootrom.img
 all: small dual-small medium dual-medium large dual-large
@@ -22,16 +22,19 @@ large: ../rocket-large-$(ROCKET_TAG).fir.gz
 dual-large: CONFIG=DualLargeConfig
 dual-large: ../rocket-dual-large-$(ROCKET_TAG).fir.gz
 
-../rocket-%-$(ROCKET_TAG).fir.gz: lib/rocketchip-$(ROCKET_TAG).jar arc.scala bootrom.img
-	mkdir -p build
-	cd lib && find . -type f -not -name 'rocketchip-$(ROCKET_TAG).jar' -delete
-	sbt "runMain freechips.rocketchip.system.Generator -td build -T arc.RocketSystem -C arc.$(CONFIG)"
-	gzip -c build/arc.$(CONFIG).fir > $@
+../rocket-%-$(ROCKET_TAG).fir.gz: lib/rocketchip-$(ROCKET_TAG).jar src/arc.scala bootrom.img mill
+	[ ! -d build ] || rm -r build
+	mkdir build
+	./mill --mill-version 0.11.11 run --top arc.RocketSystem --config arc.$(CONFIG) --dir $(PWD)/build
+	# Hacky fix for `error: sink "clint.io_rtcTick" not fully initialized in "RocketSystem"`
+	sed 's/inst clint of CLINT.*/&\n    clint.io.rtcTick is invalid/' build/RocketSystem.fir > build/RocketSystem.fixed.fir
+	gzip -c build/RocketSystem.fixed.fir > $@
 
-lib/rocketchip-$(ROCKET_TAG).jar: rocket-chip-$(ROCKET_TAG)
-	mkdir -p lib
-	cd rocket-chip-$(ROCKET_TAG) && sbt assembly
-	cp rocket-chip-$(ROCKET_TAG)/rocketchip.jar $@
+lib/rocketchip-$(ROCKET_TAG).jar: rocket-chip-$(ROCKET_TAG) mill
+	[ ! -d lib ] || rm -r lib
+	mkdir lib
+	cd rocket-chip-$(ROCKET_TAG) && ../mill rocketchip[5.0.0].assembly
+	cp rocket-chip-$(ROCKET_TAG)/out/rocketchip/5.0.0/assembly.dest/out.jar $@
 
 rocket-chip-$(ROCKET_TAG):
 	git clone --depth 1 --branch $(ROCKET_TAG) --recursive $(ROCKET_URL) $@
@@ -42,4 +45,8 @@ bootrom.img: bootrom.S
 	riscv64-unknown-elf-objcopy -O binary bootrom.elf bootrom.img
 	truncate -s 128 bootrom.img
 
-.PHONY: all build-config
+mill:
+	wget https://raw.githubusercontent.com/lefou/millw/main/millw -O $@
+	chmod +x $@
+
+.PHONY: all

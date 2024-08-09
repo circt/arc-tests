@@ -1,7 +1,7 @@
 package arc
 
-import freechips.rocketchip.config.Config
-import freechips.rocketchip.config.Parameters
+import org.chipsalliance.cde.config.Config
+import org.chipsalliance.cde.config.Parameters
 import freechips.rocketchip.subsystem._
 import freechips.rocketchip.devices.tilelink._
 import freechips.rocketchip.util.DontTouch
@@ -39,3 +39,9 @@ class RocketSystem(implicit p: Parameters) extends RocketSubsystem
 
 class RocketSystemImp[+L <: RocketSystem](_outer: L) extends RocketSubsystemModuleImp(_outer)
     with DontTouch
+
+object Main {
+  def main(args: Array[String]): Unit = {
+    println("hello")
+  }
+}
