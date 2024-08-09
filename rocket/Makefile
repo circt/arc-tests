@@ -1,10 +1,16 @@
-CXXFLAGS = -O3 -Wall -std=c++17 -no-pie
 VERILATOR_ROOT ?= $(shell verilator -getenv VERILATOR_ROOT)
 mkfile_path := $(dir $(MAKEFILE_LIST))
 REPO_ROOT := ..
 ARCILATOR_UTILS_ROOT ?= $(dir $(shell which arcilator))
 BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone.riscv
 CONFIG ?= small-v1.6
+
+CXXFLAGS = -O3 -Wall -std=c++17
+LDFLAGS =
+ifeq ($(shell uname), Linux)
+	CXXFLAGS += -no-pie
+	LDFLAGS += -latomic
+endif
 
 BUILD_DIR ?= build/$(CONFIG)
 $(shell mkdir -p $(BUILD_DIR))
@@ -70,7 +76,7 @@ $(BUILD_MODEL)-model-vtor.o: $(SOURCE_MODEL)-model-vtor.cpp $(SOURCE_MODEL)-mode
 	$(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -I/$(VERILATOR_ROOT)/include -c $< -o $@
 
 $(BUILD_MODEL)-main: $(SOURCE_MODEL)-main.cpp $(BUILD_MODEL)-model-arc.o $(BUILD_MODEL)-arc.o $(BUILD_MODEL)-model-vtor.o $(BUILD_MODEL)-vtor.a $(VERILATOR_ROOT)/include/verilated.cpp $(VERILATOR_ROOT)/include/verilated_vcd_c.cpp $(VERILATOR_ROOT)/include/verilated_threads.cpp
-	$(CXX) $(CXXFLAGS) -g -latomic -I$(REPO_ROOT)/elfio $^ -o $@
+	$(CXX) $(CXXFLAGS) -g $(LDFLAGS) -I$(REPO_ROOT)/elfio $^ -o $@
 
 #===-------------------------------------------------------------------------===
 # Convenience

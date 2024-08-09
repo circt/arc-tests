@@ -34,17 +34,9 @@ public:
     };
   }
 
-  void set_reset(bool reset) override {
-    // clang-format off
-    model.view.reset = reset;
-    // clang-format on
-  }
+  void set_reset(bool reset) override { model.view.reset = reset; }
 
-  void set_clock(bool clock) {
-    // clang-format off
-    model.view.clock = clock;
-    // clang-format on
-  }
+  void set_clock(bool clock) override { model.view.clock = clock; }
 
   void set_mem(AxiInputs &in) override {
     model.view.mem_axi4_0_aw_ready = in.aw_ready;

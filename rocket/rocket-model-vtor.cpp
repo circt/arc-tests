@@ -38,17 +38,9 @@ public:
     };
   }
 
-  void set_reset(bool reset) override {
-    // clang-format off
-    model.reset = reset;
-    // clang-format on
-  }
+  void set_reset(bool reset) override { model.reset = reset; }
 
-  void set_clock(bool clock) {
-    // clang-format off
-    model.clock = clock;
-        // clang-format on
-  }
+  void set_clock(bool clock) override { model.clock = clock; }
 
   void set_mem(AxiInputs &in) override {
     model.mem_axi4_0_aw_ready = in.aw_ready;
