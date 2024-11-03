@@ -50,7 +50,7 @@ $(MODEL)-vtor/V$(TOP_NAME)__ALL.a: $(MODEL).sv
 	verilator $(VERILATOR_FLAGS) -Mdir $(MODEL)-vtor --top-module $(TOP_NAME) $< -j 0
 
 $(MODEL)-verilator-main: $(mkfile_path)/$(MODEL)/$(MODEL)-verilator-main.cpp $(MODEL)-vtor/V$(TOP_NAME)__ALL.a $(VERILATOR_ROOT)/include/verilated.cpp $(VERILATOR_ROOT)/include/verilated_vcd_c.cpp $(VERILATOR_ROOT)/include/verilated_threads.cpp
-	g++ $(CXXFLAGS) -I$(MODEL)-vtor -I$(mkfile_path)/elfio/ -I$(VERILATOR_ROOT)/include/ $^ -o $@
+	$(CXX) $(CXXFLAGS) -I$(MODEL)-vtor -I$(mkfile_path)/elfio/ -I$(VERILATOR_ROOT)/include/ $^ -o $@
 
 verilate: $(MODEL)-verilator-main
 	./$(MODEL)-verilator-main $(BINARY)
