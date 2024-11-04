@@ -53,13 +53,14 @@ public:
   }
 
   void clock() {
-    compare_ports();
-    vcd_dump(cycle);
-    set_clock(true);
     eval();
-    set_clock(false);
-    eval();
-    ++cycle;
+    for (unsigned i = 0; i < 2; ++i) {
+      compare_ports();
+      vcd_dump(cycle);
+      ++cycle;
+      set_clock(i == 1);
+      eval();
+    }
   }
 
   void eval() override {
