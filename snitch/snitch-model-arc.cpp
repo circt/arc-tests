@@ -5,9 +5,9 @@
 
 namespace {
 class ArcilatorSnitchModel : public SnitchModel {
-  snitch model;
+  snitch_th model;
   std::ofstream vcd_stream;
-  std::unique_ptr<ValueChangeDump<snitchLayout>> model_vcd;
+  std::unique_ptr<ValueChangeDump<snitch_thLayout>> model_vcd;
 
 public:
   ArcilatorSnitchModel() { name = "arcs"; }
@@ -15,7 +15,7 @@ public:
   void vcd_start(const char *outputFile) override {
     vcd_stream.open(outputFile);
     model_vcd.reset(
-        new ValueChangeDump<snitchLayout>(model.vcd(vcd_stream)));
+        new ValueChangeDump<snitch_thLayout>(model.vcd(vcd_stream)));
   }
 
   void vcd_dump(size_t cycle) override {
@@ -25,7 +25,7 @@ public:
     }
   }
 
-  void eval() override { snitch_eval(&model.storage[0]); }
+  void eval() override { snitch_th_eval(&model.storage[0]); }
 
   Ports get_ports() override {
     return {
@@ -38,28 +38,18 @@ public:
 
   void set_clock(bool clock) override { model.view.clk_i = clock; }
 
-  void set_mem(AxiInputs &in) override {
-    model.view.data_qready_i = in.data_qready_i;
-    model.view.data_perror_i = in.data_perror_i;
-    model.view.data_pvalid_i = in.data_pvalid_i;
-    model.view.data_pdata_i = in.data_pdata_i;
-
-    model.view.inst_data_i = in.inst_data_i;
-    model.view.inst_ready_i = in.inst_ready_i;
+  void set_mem(const MemInputs &in) override {
+    model.view.mem_ready_i = in.mem_ready_i;
+    model.view.mem_rdata_i = in.mem_rdata_i;
   }
 
-  AxiOutputs get_mem() override {
-    AxiOutputs out;
-    out.data_qaddr_o = model.view.data_qaddr_o;
-    out.data_qwrite_o = model.view.data_qwrite_o;
-    out.data_qamo_o = model.view.data_qamo_o;
-    out.data_qdata_o = model.view.data_qdata_o;
-    out.data_qstrb_o = model.view.data_qstrb_o;
-    out.data_qvalid_o = model.view.data_qvalid_o;
-    out.data_pready_o = model.view.data_pready_o;
-
-    out.inst_addr_o = model.view.inst_addr_o;
-    out.inst_valid_o = model.view.inst_valid_o;
+  MemOutputs get_mem() override {
+    MemOutputs out;
+    out.mem_valid_o = model.view.mem_valid_o;
+    out.mem_addr_o = model.view.mem_addr_o;
+    out.mem_write_o = model.view.mem_write_o;
+    out.mem_wdata_o = model.view.mem_wdata_o;
+    out.mem_wstrb_o = model.view.mem_wstrb_o;
     return out;
   }
 };

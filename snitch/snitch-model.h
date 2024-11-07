@@ -8,29 +8,24 @@
 #include <string_view>
 #include <vector>
 
-/// Memory signals going into the design.
-struct AxiInputs {
-  bool data_qready_i = false;
-  bool data_perror_i = false;
-  bool data_pvalid_i = false;
-  size_t data_pdata_i = false;
-
-  size_t inst_data_i = 0;
-  bool inst_ready_i = false;
+struct Inst {
+  bool valid_o;
+  uint32_t addr_o;
+  bool ready_i;
+  uint32_t data_i;
 };
 
-/// Memory signals coming out of the design.
-struct AxiOutputs {
-  size_t data_qaddr_o = 0;
-  bool data_qwrite_o = false;
-  size_t data_qamo_o = 0;
-  size_t data_qdata_o = 0;
-  size_t data_qstrb_o = 0;
-  bool data_qvalid_o = false;
-  bool data_pready_o = false;
+struct MemInputs {
+  bool mem_ready_i;
+  uint64_t mem_rdata_i;
+};
 
-  size_t inst_addr_o = 0;
-  bool inst_valid_o = false;
+struct MemOutputs {
+  bool mem_valid_o;
+  uint32_t mem_addr_o;
+  bool mem_write_o;
+  uint64_t mem_wdata_o;
+  uint8_t mem_wstrb_o;
 };
 
 /// Abstract interface to an Arcilator or Verilator model.
@@ -46,14 +41,16 @@ public:
   SnitchModel() {}
   virtual ~SnitchModel();
 
-  virtual void vcd_start(const char *outputFile) {}
-  virtual void vcd_dump(size_t cycle) {}
-  virtual void eval() {}
+  virtual void vcd_start(const char *outputFile) = 0;
+  virtual void vcd_dump(size_t cycle) = 0;
+  virtual void eval() = 0;
   virtual Ports get_ports() { return {}; }
-  virtual void set_clock(bool clock) {}
-  virtual void set_reset(bool reset) {}
-  virtual void set_mem(AxiInputs &in) {}
-  virtual AxiOutputs get_mem() { return {}; }
+  virtual void set_clock(bool clock) = 0;
+  virtual void set_reset(bool reset) = 0;
+  virtual void set_inst(const Inst &in) {}
+  virtual void get_inst(Inst &out) {}
+  virtual void set_mem(const MemInputs &in) {}
+  virtual MemOutputs get_mem() { return {}; }
 
   const char *name = "unknown";
   std::chrono::high_resolution_clock::duration duration =

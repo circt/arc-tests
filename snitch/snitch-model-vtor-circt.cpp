@@ -5,7 +5,7 @@
 
 namespace {
 class VerilatorSnitchModel : public SnitchModel {
-  Vsnitch__02dcirct model;
+  VSnitchCirct model;
   std::unique_ptr<VerilatedVcdC> model_vcd;
 
 public:
@@ -42,28 +42,28 @@ public:
 
   void set_clock(bool clock) override { model.clk_i = clock; }
 
-  void set_mem(AxiInputs &in) override {
-    model.data_qready_i = in.data_qready_i;
-    model.data_perror_i = in.data_perror_i;
-    model.data_pvalid_i = in.data_pvalid_i;
-    model.data_pdata_i = in.data_pdata_i;
-
-    model.inst_data_i = in.inst_data_i;
-    model.inst_ready_i = in.inst_ready_i;
+  void set_inst(const Inst &in) override {
+    model.inst_ready_i = in.ready_i;
+    model.inst_data_i = in.data_i;
   }
 
-  AxiOutputs get_mem() override {
-    AxiOutputs out;
-    out.data_qaddr_o = model.data_qaddr_o;
-    out.data_qwrite_o = model.data_qwrite_o;
-    out.data_qamo_o = model.data_qamo_o;
-    out.data_qdata_o = model.data_qdata_o;
-    out.data_qstrb_o = model.data_qstrb_o;
-    out.data_qvalid_o = model.data_qvalid_o;
-    out.data_pready_o = model.data_pready_o;
+  void get_inst(Inst &out) override {
+    out.valid_o = model.inst_valid_o;
+    out.addr_o = model.inst_addr_o;
+  }
 
-    out.inst_addr_o = model.inst_addr_o;
-    out.inst_valid_o = model.inst_valid_o;
+  void set_mem(const MemInputs &in) override {
+    model.mem_ready_i = in.mem_ready_i;
+    model.mem_rdata_i = in.mem_rdata_i;
+  }
+
+  MemOutputs get_mem() override {
+    MemOutputs out;
+    out.mem_valid_o = model.mem_valid_o;
+    out.mem_addr_o = model.mem_addr_o;
+    out.mem_write_o = model.mem_write_o;
+    out.mem_wdata_o = model.mem_wdata_o;
+    out.mem_wstrb_o = model.mem_wstrb_o;
     return out;
   }
 };

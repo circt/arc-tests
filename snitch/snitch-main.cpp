@@ -82,12 +82,22 @@ public:
       model->set_reset(reset);
   }
 
-  void set_mem(AxiInputs &in) override {
+  void set_inst(const Inst &in) override {
+    for (auto &model : models)
+      model->set_inst(in);
+  }
+
+  void get_inst(Inst &out) override {
+    if (!models.empty())
+      models[0]->get_inst(out);
+  }
+
+  void set_mem(const MemInputs &in) override {
     for (auto &model : models)
       model->set_mem(in);
   }
 
-  AxiOutputs get_mem() override {
+  MemOutputs get_mem() override {
     if (models.empty())
       return {};
     return models[0]->get_mem();
@@ -112,75 +122,6 @@ public:
     }
   }
 };
-
-struct AxiPort {
-  AxiInputs in;
-  AxiOutputs out;
-
-  void update();
-
-  std::function<void(size_t addr, size_t &data)> readFn;
-  std::function<void(size_t addr, size_t data, size_t mask)> writeFn;
-
-private:
-  unsigned data_resp_pending = 0;
-};
-
-void AxiPort::update() {
-  if (in.data_pvalid_i && out.data_pready_o)
-    --data_resp_pending;
-  if (out.data_qvalid_o && in.data_qready_i)
-    ++data_resp_pending;
-
-  in.data_qready_i = true;
-  if (readFn)
-    readFn(out.data_qaddr_o, in.data_pdata_i);
-  else
-    in.data_pdata_i = 0x1050007310500073; // wfi
-
-  in.data_perror_i = false;
-  in.data_pvalid_i = data_resp_pending > 0;
-
-  if (readFn)
-    readFn(out.inst_addr_o, in.inst_data_i);
-  else
-    in.inst_data_i = 0x1050007310500073; // wfi
-
-  in.inst_ready_i = true;
-
-  // // Handle write data.
-  // in.w_ready = write_beats_left > 0;
-  // if (out.w_valid && in.w_ready) {
-  //   if (writeFn) {
-  //     size_t strb = out.w_strb;
-  //     strb &= ((1 << (1 << write_size)) - 1) << (write_addr % 8);
-  //     writeFn(write_addr, out.w_data, strb);
-  //   }
-  //   assert(out.w_last == (write_beats_left == 1));
-  //   --write_beats_left;
-  //   write_addr = ((write_addr >> write_size) + 1) << write_size;
-  // }
-
-  // in.aw_ready = write_beats_left == 0 && write_acked;
-  // in.ar_ready = read_beats_left == 0;
-
-  // // Accept new reads.
-  // if (out.ar_valid && in.ar_ready) {
-  //   read_beats_left = out.ar_len + 1;
-  //   read_id = out.ar_id;
-  //   read_addr = out.ar_addr;
-  //   read_size = out.ar_size;
-  // }
-
-  // // Accept new writes.
-  // if (out.aw_valid && in.aw_ready) {
-  //   write_beats_left = out.aw_len + 1;
-  //   write_id = out.aw_id;
-  //   write_addr = out.aw_addr;
-  //   write_size = out.aw_size;
-  //   write_acked = false;
-  // }
-}
 
 int main(int argc, char **argv) {
   //===--------------------------------------------------------------------===//
@@ -228,6 +169,7 @@ int main(int argc, char **argv) {
     std::cerr << "options:\n";
     std::cerr << "  --arcs         run arcilator simulation\n";
     std::cerr << "  --vtor         run verilator simulation\n";
+    std::cerr << "  --vtor-circt   run verilator round-trip simulation\n";
     std::cerr << "  --trace <VCD>  write trace to <VCD> file\n";
     return 1;
   }
@@ -236,7 +178,7 @@ int main(int argc, char **argv) {
   // Read ELF into memory
   //===--------------------------------------------------------------------===//
 
-  std::map<uint64_t, uint64_t> memory;
+  std::map<uint32_t, uint64_t> memory;
   {
     ELFIO::elfio elf;
     if (!elf.load(argv[1])) {
@@ -252,34 +194,26 @@ int main(int argc, char **argv) {
                 << " (virtual address " << segment->get_virtual_address()
                 << ")\n";
       for (unsigned i = 0; i < segment->get_memory_size(); ++i) {
-        uint64_t addr = segment->get_physical_address() + i;
+        uint32_t addr = segment->get_physical_address() + i;
         uint8_t data = 0;
         if (i < segment->get_file_size())
           data = segment->get_data()[i];
-        auto &slot = memory[addr / 8 * 8];
-        slot &= ~((uint64_t)0xFF << ((addr % 8) * 8));
-        slot |= (uint64_t)data << ((addr % 8) * 8);
+        constexpr unsigned bpw = sizeof(memory[0]);
+        auto &slot = memory[addr / bpw * bpw];
+        slot &= ~((uint64_t)0xFF << ((addr % bpw) * 8));
+        slot |= (uint64_t)data << ((addr % bpw) * 8);
       }
     }
     std::cerr << "entry " << elf.get_entry() << "\n";
     std::cerr << std::dec;
-    std::cerr << "loaded " << memory.size() * 8 << " program bytes\n";
+    std::cerr << "loaded " << memory.size() * sizeof(memory[0])
+              << " program bytes\n";
   }
 
-  // Place bootrom
-	memory[BOOTROM_BASE+0] = 0x3e800713; // li      a4,1000
-	memory[BOOTROM_BASE+1] = 0x00100793; // li      a5,1
-	memory[BOOTROM_BASE+2] = 0x00000613; // li      a2,0
-	memory[BOOTROM_BASE+3] = 0xcafe15b7; // lui     a1,0xcafe1
-	memory[BOOTROM_BASE+4] = 0x00f606b3; // add     a3,a2,a5
-	memory[BOOTROM_BASE+5] = 0x00d5a023; // sw      a3,0(a1) # cafe1000 <__global_pointer$+0xcafcf7cc>
-	memory[BOOTROM_BASE+6] = 0xfff70713; // addi    a4,a4,-1
-	memory[BOOTROM_BASE+7] = 0x00078613; // mv      a2,a5
-	memory[BOOTROM_BASE+8] = 0x00068793; // mv      a5,a3
-	memory[BOOTROM_BASE+9] = 0xfe0716e3; // bnez    a4,10010 <_start+0x10>
-	memory[BOOTROM_BASE+10] = 0x10500073; // wfi
-	memory[BOOTROM_BASE+11] = 0xffdff06f; // j       10028 <_start+0x28>
-	memory[BOOTROM_BASE+12] = 0x00008067; // ret
+  // Place bootrom.
+  memory[BOOTROM_BASE + 0] = 0;
+  memory[BOOTROM_BASE + 0] |= 0x80000537UL;       // lui a0, 0x80000
+  memory[BOOTROM_BASE + 0] |= 0x00050067UL << 32; // jr a0  # 0x80000000
 
   // Allocate the simulation models.
   ComparingSnitchModel model;
@@ -305,60 +239,98 @@ int main(int argc, char **argv) {
   // Simulation loop
   //===--------------------------------------------------------------------===//
 
-  AxiPort mem_port;
-  mem_port.readFn = [&](size_t addr, size_t &data) {
-    auto it = memory.find(addr / 8 * 8);
-    if (it != memory.end())
-      data = it->second;
-    else
-      data = 0x1050007310500073;
-  };
-  mem_port.writeFn = [&](size_t addr, size_t data, size_t mask) {
-    assert(mask == 0xFF && "only full 64 bit write supported");
-    memory[addr / 8 * 8] = data;
-  };
+  // AxiPort mem_port;
+  // mem_port.readFn = [&](size_t addr, size_t &data) {
+  //   auto it = memory.find(addr / 8 * 8);
+  //   if (it != memory.end())
+  //     data = it->second;
+  //   else
+  //     data = 0x1050007310500073;
+  // };
+  // mem_port.writeFn = [&](size_t addr, size_t data, size_t mask) {
+  //   assert(mask == 0xFF && "only full 64 bit write supported");
+  //   memory[addr / 8 * 8] = data;
+  // };
 
+  // AxiPort mmio_port;
+  // mmio_port.writeFn = [&](size_t addr, size_t data, size_t mask) {
+  //   assert(mask == 0xFF && "only full 64 bit write supported");
+  //   memory[addr / 8 * 8] = data;
 
-  AxiPort mmio_port;
-  mmio_port.writeFn = [&](size_t addr, size_t data, size_t mask) {
-    assert(mask == 0xFF && "only full 64 bit write supported");
-    memory[addr / 8 * 8] = data;
+  //   // For a zero return code from the main function, 1 is written to tohost.
+  //   if (addr == TOHOST_ADDR) {
+  //     if (data == 1) {
+  //       finished = true;
+  //       std::cout << "Benchmark run successful!\n";
+  //       return;
+  //     }
 
-    // For a zero return code from the main function, 1 is written to tohost.
-    if (addr == TOHOST_ADDR) {
-      if (data == 1) {
-        finished = true;
-        std::cout << "Benchmark run successful!\n";
-        return;
-      }
-
-      if (data == SYS_write) {
-        for (int i = 0; i < TOHOST_DATA_SIZE; i += 8) {
-          uint64_t data = memory[TOHOST_DATA_ADDR + i];
-          unsigned char c[8];
-          *(uint64_t*) c = data;
-          for (int k = 0; k < 8; ++k) {
-            std::cout << c[k];
-            if ((unsigned char) c[k] == 0)
-              return;
-          }
-        }
-      }
-    }
-  };
-  mmio_port.readFn = [&](size_t addr, size_t &data) {
-    // Core loops on condition fromhost=0, thus set it to something non-zero.
-    if (addr == FROMHOST_ADDR)
-      data = -1;
-  };
+  //     if (data == SYS_write) {
+  //       for (int i = 0; i < TOHOST_DATA_SIZE; i += 8) {
+  //         uint64_t data = memory[TOHOST_DATA_ADDR + i];
+  //         unsigned char c[8];
+  //         *(uint64_t *)c = data;
+  //         for (int k = 0; k < 8; ++k) {
+  //           std::cout << c[k];
+  //           if ((unsigned char)c[k] == 0)
+  //             return;
+  //         }
+  //       }
+  //     }
+  //   }
+  // };
+  // mmio_port.readFn = [&](size_t addr, size_t &data) {
+  //   // Core loops on condition fromhost=0, thus set it to something non-zero.
+  //   if (addr == FROMHOST_ADDR)
+  //     data = -1;
+  // };
 
   size_t num_bad_cycles = 0;
-  for (unsigned i = 0; i < 1000000; ++i) {
-    mem_port.out = model.get_mem();
-    mem_port.update();
-    model.set_mem(mem_port.in);
+  for (unsigned i = 0; i < 1000; ++i) {
+    // Service the instruction interface.
+    Inst inst = {};
+    model.get_inst(inst);
+    inst.ready_i = true;
+    if (inst.valid_o) {
+      uint64_t data = -1;
+      if (auto it = memory.find(inst.addr_o / 8 * 8); it != memory.end()) {
+        data = it->second;
+      } else {
+        std::cerr << "cycle " << model.cycle
+                  << ": instruction fetch from unmapped address " << std::hex
+                  << inst.addr_o << std::dec << "\n";
+      }
+      inst.data_i = data >> ((inst.addr_o / 4) * 32);
+      std::cerr << "cycle " << model.cycle << ": fetched [0x" << std::hex
+                << inst.addr_o << "] = 0x" << inst.data_i << std::dec << "\n";
+    }
+    model.set_inst(inst);
 
-    // model.eval();
+    // Service the memory interface.
+    // auto out = model.get_mem();
+    // MemInputs in = {};
+    // in.mem_ready_i = false;
+    // if (out.mem_valid_o) {
+    //   uint64_t &data = memory[out.mem_addr_o / 8 * 8];
+    //   if (out.mem_write_o) {
+    //     uint64_t mask = 0;
+    //     for (unsigned i = 0; i < 8; ++i)
+    //       if ((out.mem_wstrb_o >> i) & 1)
+    //         mask |= 0xFFull << (i * 8);
+    //     data = (data & ~mask) | (out.mem_wdata_o & mask);
+    //   }
+    //   in.mem_rdata_i = data;
+
+    //   const char *word = out.mem_write_o ? "writing" : "reading";
+    //   std::cerr << "cycle " << model.cycle << ": " << word << " [0x" <<
+    //   std::hex
+    //             << (out.mem_addr_o / 8 * 8) << "] m"
+    //             << (uint16_t)out.mem_wstrb_o << " = 0x" << data << std::dec
+    //             << "\n";
+    // }
+    // model.set_mem(in);
+
+    // Toggle the clock.
     model.clock();
 
     if (finished)

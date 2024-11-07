@@ -34,14 +34,14 @@ endif
 # SystemVerilog to HW
 #===-------------------------------------------------------------------------===
 
-$(BUILD_MODEL).mlir: design/$(SOURCE_MODEL).sv
-	circt-verilog $< --top=snitch -I./design -o $@
+build/snitch.mlir: design/snitch_th.sv design/snitch.sv $(shell which circt-verilog)
+	circt-verilog design/snitch_th.sv design/snitch.sv --top=snitch_th -I./design -o $@ --mlir-print-debuginfo
 
 #===-------------------------------------------------------------------------===
 # Arcilator
 #===-------------------------------------------------------------------------===
 
-$(BUILD_MODEL)-arc.o $(BUILD_MODEL).json: $(BUILD_MODEL).mlir
+$(BUILD_MODEL)-arc.o $(BUILD_MODEL).json: $(BUILD_MODEL).mlir $(shell which arcilator)
 	arcilator $< --state-file=$(BUILD_MODEL).json -o $(BUILD_MODEL)-arc.ll $(ARCILATOR_ARGS)
 	opt -O3 -S $(BUILD_MODEL)-arc.ll | llc -O3 --filetype=obj -o $(BUILD_MODEL)-arc.o
 	objdump -d $(BUILD_MODEL)-arc.o > $(BUILD_MODEL)-arc.s
@@ -53,10 +53,10 @@ $(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
 # Verilator
 #===-------------------------------------------------------------------------===
 
-$(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h: design/$(SOURCE_MODEL).sv
-	verilator -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ -Idesign --build -j 0 -Wno-WIDTH $(VERILATOR_ARGS)
-	cp $(BUILD_MODEL)-vtor/Vsnitch__ALL.a $(BUILD_MODEL)-vtor.a
-	cp $(BUILD_MODEL)-vtor/Vsnitch.h $(BUILD_MODEL)-vtor.h
+$(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h: design/snitch_th.sv design/snitch.sv
+	verilator -sv -cc -Mdir $(BUILD_MODEL)-vtor -top snitch_th -prefix VSnitch $^ -Idesign --build -j 0 -Wno-WIDTH $(VERILATOR_ARGS)
+	cp $(BUILD_MODEL)-vtor/VSnitch__ALL.a $(BUILD_MODEL)-vtor.a
+	cp $(BUILD_MODEL)-vtor/VSnitch.h $(BUILD_MODEL)-vtor.h
 
 #===-------------------------------------------------------------------------===
 # Verilator CIRCT
@@ -66,9 +66,9 @@ $(BUILD_MODEL)-circt.sv: $(BUILD_MODEL).mlir
 	firtool --lowering-options=disallowLocalVariables $< -o $@
 
 $(BUILD_MODEL)-vtor-circt.a $(BUILD_MODEL)-vtor-circt.h: $(BUILD_MODEL)-circt.sv $(REPO_ROOT)/EICG_wrapper.v
-	verilator -sv -cc -Mdir $(BUILD_MODEL)-vtor-circt $^ -Idesign --build -j 0 -Wno-WIDTH $(VERILATOR_ARGS)
-	cp $(BUILD_MODEL)-vtor-circt/Vsnitch__02dcirct__ALL.a $(BUILD_MODEL)-vtor-circt.a
-	cp $(BUILD_MODEL)-vtor-circt/Vsnitch__02dcirct.h $(BUILD_MODEL)-vtor-circt.h
+	verilator -sv -cc -Mdir $(BUILD_MODEL)-vtor-circt -top snitch_th $^ -prefix VSnitchCirct -Idesign --build -j 0 -Wno-WIDTH $(VERILATOR_ARGS)
+	cp $(BUILD_MODEL)-vtor-circt/VSnitchCirct__ALL.a $(BUILD_MODEL)-vtor-circt.a
+	cp $(BUILD_MODEL)-vtor-circt/VSnitchCirct.h $(BUILD_MODEL)-vtor-circt.h
 
 #===-------------------------------------------------------------------------===
 # Testbench

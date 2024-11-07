@@ -45,7 +45,7 @@ $(BUILD_MODEL).mlir: $(BUILD_MODEL).fir
 # Arcilator
 #===-------------------------------------------------------------------------===
 
-$(BUILD_MODEL)-arc.o $(BUILD_MODEL).json &: $(BUILD_MODEL).mlir
+$(BUILD_MODEL)-arc.o $(BUILD_MODEL).json &: $(BUILD_MODEL).mlir $(shell which arcilator)
 	arcilator $< --state-file=$(BUILD_MODEL).json -o $(BUILD_MODEL)-arc.ll $(ARCILATOR_ARGS)
 	opt -O3 -S $(BUILD_MODEL)-arc.ll | llc -O3 --filetype=obj -o $(BUILD_MODEL)-arc.o
 	objdump -d $(BUILD_MODEL)-arc.o > $(BUILD_MODEL)-arc.s
