@@ -101,6 +101,8 @@ run-vtor-circt: RUN_ARGS += --vtor-circt
 run-vtor-circt: run
 run-trace: RUN_ARGS += --trace $(BUILD_MODEL).vcd
 run-trace: run
+run-trace-vtors: RUN_ARGS += --vtor --vtor-circt
+run-trace-vtors: run-trace
 
 benchmark: $(BUILD_MODEL)-main
 	$(REPO_ROOT)/benchmark.py -- $(BUILD_MODEL)-main $(BINARY) $(RUN_ARGS)
