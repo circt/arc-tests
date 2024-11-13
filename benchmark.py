@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Example: ./benchmark.py -- build/rocket-small/rocket-main benchmarks/dhrystone/dhrystone.riscv
+# Example: ./benchmark.py -- build/rocket-small/rocket-main benchmarks/dhrystone/dhrystone_rv64gcv.riscv
 
 from collections import OrderedDict
 import argparse

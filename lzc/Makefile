@@ -2,7 +2,7 @@ VERILATOR_ROOT ?= $(shell verilator -getenv VERILATOR_ROOT)
 mkfile_path := $(dir $(MAKEFILE_LIST))
 REPO_ROOT := ..
 ARCILATOR_UTILS_ROOT ?= $(dir $(shell which arcilator))
-BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone.riscv
+BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone_rv32i.riscv
 
 CXXFLAGS = -O3 -Wall -std=c++17
 LDFLAGS =

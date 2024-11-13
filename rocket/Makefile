@@ -3,7 +3,7 @@ mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 mkfile_dir := $(dir $(mkfile_path))
 REPO_ROOT := $(mkfile_dir)..
 ARCILATOR_UTILS_ROOT ?= $(dir $(shell which arcilator))
-BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone.riscv
+BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone_rv64gcv.riscv
 CONFIG ?= small-v1.6
 
 CXX_OPT_LEVEL ?= -O3

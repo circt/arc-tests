@@ -5,7 +5,7 @@ ARCILATOR_UTILS_ROOT ?= $(dir $(shell which arcilator))
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 mkfile_dir := $(dir $(mkfile_path))
 REPO_ROOT := $(mkfile_dir)..
-BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone.riscv
+BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone_rv64gcv.riscv
 CONFIG ?= small
 
 ARCILATOR ?= $(shell which arcilator)

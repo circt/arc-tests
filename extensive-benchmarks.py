@@ -144,11 +144,11 @@ def benchmark_simulation_performance(config: Config, uniquifier: string, cxx_opt
 
     # Warmup
     for i in range(3):
-        subprocess.call(f'{rocket_or_boom}/{build_dir}{rocket_or_boom}-main benchmarks/dhrystone.riscv 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
+        subprocess.call(f'{rocket_or_boom}/{build_dir}{rocket_or_boom}-main benchmarks/dhrystone_rv64gcv.riscv 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
 
     # Runs
     for i in range(10):
-        subprocess.call(f'{rocket_or_boom}/{build_dir}{rocket_or_boom}-main benchmarks/dhrystone.riscv 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
+        subprocess.call(f'{rocket_or_boom}/{build_dir}{rocket_or_boom}-main benchmarks/dhrystone_rv64gcv.riscv 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
 
 def collect_hardware_counter_info(config: Config, uniquifier: string, cxx_opt_level = "-O3"):
     measurement_file = f'./measurements/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}/hardware-counters.txt'
@@ -157,10 +157,10 @@ def collect_hardware_counter_info(config: Config, uniquifier: string, cxx_opt_le
     rocket_or_boom = "rocket" if config.design.is_rocket() else "boom"
 
     # Warmup
-    subprocess.call(f'perf stat -ddd {rocket_or_boom}/{build_dir}{rocket_or_boom}-main benchmarks/dhrystone.riscv 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
+    subprocess.call(f'perf stat -ddd {rocket_or_boom}/{build_dir}{rocket_or_boom}-main benchmarks/dhrystone_rv64gcv.riscv 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
 
     # Runs
-    subprocess.call(f'perf stat -ddd {rocket_or_boom}/{build_dir}{rocket_or_boom}-main benchmarks/dhrystone.riscv 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
+    subprocess.call(f'perf stat -ddd {rocket_or_boom}/{build_dir}{rocket_or_boom}-main benchmarks/dhrystone_rv64gcv.riscv 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
 
 def benchmark_simulation_performance_all():
     for design in all_designs:

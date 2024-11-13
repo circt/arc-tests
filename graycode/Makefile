@@ -3,7 +3,7 @@ mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
 mkfile_dir := $(dir $(mkfile_path))
 REPO_ROOT := $(mkfile_dir)..
 ARCILATOR_UTILS_ROOT ?= $(dir $(shell which arcilator))
-BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone.riscv
+BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone_rv32i.riscv
 
 CXX_OPT_LEVEL ?= -O3
 CXXFLAGS = $(CXX_OPT_LEVEL) -std=c++17 -no-pie
