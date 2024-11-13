@@ -7,5 +7,6 @@
 build
 boom/generator/project
 boom/generator/target
+boom/generator/out
 rocket/generator/rocket-chip-v1.4/
 rocket/generator/rocket-chip-v1.6/

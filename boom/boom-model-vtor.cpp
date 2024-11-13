@@ -40,13 +40,23 @@ public:
 
   void set_reset(bool reset) override {
     // clang-format off
-    model.reset = reset;
+    model.io_aggregator_5_reset = reset;
+    model.io_aggregator_4_reset = reset;
+    model.io_aggregator_3_reset = reset;
+    model.io_aggregator_2_reset = reset;
+    model.io_aggregator_1_reset = reset;
+    model.io_aggregator_0_reset = reset;
     // clang-format on
   }
 
   void set_clock(bool clock) {
     // clang-format off
-    model.clock = clock;
+    model.io_aggregator_5_clock = clock;
+    model.io_aggregator_4_clock = clock;
+    model.io_aggregator_3_clock = clock;
+    model.io_aggregator_2_clock = clock;
+    model.io_aggregator_1_clock = clock;
+    model.io_aggregator_0_clock = clock;
     // clang-format on
   }
 
