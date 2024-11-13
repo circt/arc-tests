@@ -89,7 +89,7 @@ def invoke_make(config: Config, action: string, measurement_file: string, build_
     run_verilator_circt = "1" if simulator == Simulator.VerilatorCIRCT else "0"
 
     # Build the benchmark
-    subprocess.call(f'make -C {rocket_or_boom} {action} BENCHMARK_OUT_FILE={measurement_file} BENCHMARK_MODE=1 CXX_OPT_LEVEL={cxx_opt_level} BUILD_DIR={build_dir} CONFIG={design.to_string()} ARCILATOR_ARGS="{config.options}" RUN_VTOR_CIRCT={run_verilator_circt} RUN_ARC={run_arcilator} RUN_VTOR={run_verilator}', shell=True)
+    subprocess.call(f'make -C {rocket_or_boom} {action} BENCHMARK_OUT_FILE={measurement_file} BENCHMARK_MODE=1 CXX_OPT_LEVEL={cxx_opt_level} BUILD_DIR={build_dir} CONFIG={design.to_string()} RUN_VTOR_CIRCT={run_verilator_circt} RUN_ARC={run_arcilator} RUN_VTOR={run_verilator}', shell=True)
 
 boom_designs = [
     Design.BoomMega,
