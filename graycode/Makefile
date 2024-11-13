@@ -137,7 +137,7 @@ ifeq ($(RUN_ARC),1)
 	MAIN_DEP_LIST += $(BUILD_MODEL)-model-arc.o $(BUILD_MODEL)-arc.o
 endif
 ifeq ($(RUN_VTOR),1)
-	MAIN_DEP_LIST += $(BUILD_MODEL)-model-vtor.o $(BUILD_MODEL)-vtor.a$(BUILD_MODEL)-model-vtor.o $(BUILD_MODEL)-vtor.a
+	MAIN_DEP_LIST += $(BUILD_MODEL)-model-vtor.o $(BUILD_MODEL)-vtor.a
 endif
 ifeq ($(RUN_VTOR_CIRCT),1)
 	MAIN_DEP_LIST += $(BUILD_MODEL)-model-vtor-circt.o $(BUILD_MODEL)-vtor-circt.a 

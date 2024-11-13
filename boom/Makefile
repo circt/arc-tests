@@ -114,7 +114,7 @@ ifeq ($(RUN_ARC),1)
 	MAIN_DEP_LIST += $(BUILD_MODEL)-model-arc.o $(BUILD_MODEL)-arc.o
 endif
 ifeq ($(RUN_VTOR),1)
-	MAIN_DEP_LIST += $(BUILD_MODEL)-model-vtor.o $(BUILD_MODEL)-vtor.a$(BUILD_MODEL)-model-vtor.o $(BUILD_MODEL)-vtor.a
+	MAIN_DEP_LIST += $(BUILD_MODEL)-model-vtor.o $(BUILD_MODEL)-vtor.a
   MAIN_DEP_LIST += $(VERILATOR_ROOT)/include/verilated.cpp $(VERILATOR_ROOT)/include/verilated_vcd_c.cpp $(VERILATOR_ROOT)/include/verilated_threads.cpp
 endif
 
