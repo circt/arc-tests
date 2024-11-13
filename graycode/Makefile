@@ -5,12 +5,24 @@ REPO_ROOT := $(mkfile_dir)..
 ARCILATOR_UTILS_ROOT ?= $(dir $(shell which arcilator))
 BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone.riscv
 
-CXXFLAGS = -O3 -Wall -std=c++17
+CXX_OPT_LEVEL ?= -O3
+CXXFLAGS = $(CXX_OPT_LEVEL) -Wall -std=c++17 -no-pie
 LDFLAGS =
 ifeq ($(shell uname), Linux)
 	CXXFLAGS += -no-pie
 	LDFLAGS += -latomic
 endif
+
+ARCILATOR ?= $(shell which arcilator)
+ARCILATOR := ${ARCILATOR}
+VERILATOR ?= $(shell which verilator)
+VERILATOR := ${VERILATOR}
+FIRTOOL ?= $(shell which firtool)
+FIRTOOL := ${FIRTOOL}
+OPT ?= $(shell which opt)
+OPT := ${OPT}
+LLC ?= $(shell which llc)
+LLC := ${LLC}
 
 BUILD_DIR ?= build
 $(shell mkdir -p $(BUILD_DIR))
@@ -55,10 +67,10 @@ build/graycode.mlir: design/graycode.sv $(shell which circt-verilog)
 # Arcilator
 #===-------------------------------------------------------------------------===
 
-$(BUILD_MODEL)-arc.o $(BUILD_MODEL).json: $(BUILD_MODEL).mlir $(shell which arcilator)
-	arcilator $< --state-file=$(BUILD_MODEL).json -o $(BUILD_MODEL)-arc.ll $(ARCILATOR_ARGS)
-	opt -O3 -S $(BUILD_MODEL)-arc.ll | llc -O3 --filetype=obj -o $(BUILD_MODEL)-arc.o
-	objdump -d $(BUILD_MODEL)-arc.o > $(BUILD_MODEL)-arc.s
+$(BUILD_MODEL)-arc.o $(BUILD_MODEL).json: $(BUILD_MODEL).mlir $(ARCILATOR)
+	$(ARCILATOR) $< --state-file=$(BUILD_MODEL).json -o $(BUILD_MODEL)-arc.ll $(ARCILATOR_ARGS)
+	$(OPT) -O3 -S $(BUILD_MODEL)-arc.ll | $(LLC) -O3 --filetype=obj -o $(BUILD_MODEL)-arc.o
+# objdump -d $(BUILD_MODEL)-arc.o > $(BUILD_MODEL)-arc.s
 
 $(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
 	python3 $(ARCILATOR_UTILS_ROOT)/arcilator-header-cpp.py $< --view-depth 1 > $@
@@ -68,7 +80,7 @@ $(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h: design/graycode.sv
-	verilator -sv -cc -Mdir $(BUILD_MODEL)-vtor -top graycode -prefix VGraycode $^ -Idesign --build -j 0 -O3 -Wno-WIDTH $(VERILATOR_ARGS)
+	$(VERILATOR) -sv -cc -Mdir $(BUILD_MODEL)-vtor -top graycode -prefix VGraycode $^ -Idesign --build -j 0 -O3 -Wno-WIDTH $(VERILATOR_ARGS)
 	cp $(BUILD_MODEL)-vtor/VGraycode__ALL.a $(BUILD_MODEL)-vtor.a
 	cp $(BUILD_MODEL)-vtor/VGraycode.h $(BUILD_MODEL)-vtor.h
 
@@ -77,10 +89,10 @@ $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h: design/graycode.sv
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL)-circt.sv: $(BUILD_MODEL).mlir
-	firtool --lowering-options=disallowLocalVariables $< -o $@
+	$(FIRTOOL) --lowering-options=disallowLocalVariables $< -o $@
 
 $(BUILD_MODEL)-vtor-circt.a $(BUILD_MODEL)-vtor-circt.h: $(BUILD_MODEL)-circt.sv $(REPO_ROOT)/EICG_wrapper.v
-	verilator -sv -cc -Mdir $(BUILD_MODEL)-vtor-circt -top graycode $^ -prefix VGraycodeCirct -Idesign --build -j 0 -O3 -Wno-WIDTH $(VERILATOR_ARGS)
+	$(VERILATOR) -sv -cc -Mdir $(BUILD_MODEL)-vtor-circt -top graycode $^ -prefix VGraycodeCirct -Idesign --build -j 0 -O3 -Wno-WIDTH $(VERILATOR_ARGS)
 	cp $(BUILD_MODEL)-vtor-circt/VGraycodeCirct__ALL.a $(BUILD_MODEL)-vtor-circt.a
 	cp $(BUILD_MODEL)-vtor-circt/VGraycodeCirct.h $(BUILD_MODEL)-vtor-circt.h
 

@@ -6,12 +6,24 @@ ARCILATOR_UTILS_ROOT ?= $(dir $(shell which arcilator))
 BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone.riscv
 CONFIG ?= small-v1.6
 
-CXXFLAGS = -O3 -Wall -std=c++17
+CXX_OPT_LEVEL ?= -O3
+CXXFLAGS = $(CXX_OPT_LEVEL) -Wall -std=c++17 -no-pie
 LDFLAGS =
 ifeq ($(shell uname), Linux)
 	CXXFLAGS += -no-pie
 	LDFLAGS += -latomic
 endif
+
+ARCILATOR ?= $(shell which arcilator)
+ARCILATOR := ${ARCILATOR}
+VERILATOR ?= $(shell which verilator)
+VERILATOR := ${VERILATOR}
+FIRTOOL ?= $(shell which firtool)
+FIRTOOL := ${FIRTOOL}
+OPT ?= $(shell which opt)
+OPT := ${OPT}
+LLC ?= $(shell which llc)
+LLC := ${LLC}
 
 BUILD_DIR ?= build/$(CONFIG)
 $(shell mkdir -p $(BUILD_DIR))
@@ -56,9 +68,9 @@ $(BUILD_MODEL).mlir: $(BUILD_MODEL).fir
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL)-arc.o $(BUILD_MODEL).json &: $(BUILD_MODEL).mlir $(shell which arcilator)
-	arcilator $< --state-file=$(BUILD_MODEL).json -o $(BUILD_MODEL)-arc.ll $(ARCILATOR_ARGS)
-	opt -O3 -S $(BUILD_MODEL)-arc.ll | llc -O3 --filetype=obj -o $(BUILD_MODEL)-arc.o
-	objdump -d $(BUILD_MODEL)-arc.o > $(BUILD_MODEL)-arc.s
+	$(ARCILATOR) $< --state-file=$(BUILD_MODEL).json -o $(BUILD_MODEL)-arc.ll $(ARCILATOR_ARGS)
+	$(OPT) -O3 -S $(BUILD_MODEL)-arc.ll | $(LLC) -O3 --filetype=obj -o $(BUILD_MODEL)-arc.o
+# objdump -d $(BUILD_MODEL)-arc.o > $(BUILD_MODEL)-arc.s
 
 $(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
 	python3 $(ARCILATOR_UTILS_ROOT)/arcilator-header-cpp.py $< --view-depth 1 > $@
@@ -68,10 +80,10 @@ $(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL).sv: $(BUILD_MODEL).mlir
-	firtool --lowering-options=disallowLocalVariables $< -o $@
+	$(FIRTOOL) --lowering-options=disallowLocalVariables $< -o $@
 
 $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h &: $(BUILD_MODEL).sv $(REPO_ROOT)/verilator-stubs.sv
-	verilator -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -O3 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS)
+	$(VERILATOR) -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -O3 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS)
 	cp $(BUILD_MODEL)-vtor/Vrocket__ALL.a $(BUILD_MODEL)-vtor.a
 	cp $(BUILD_MODEL)-vtor/Vrocket.h $(BUILD_MODEL)-vtor.h
 
