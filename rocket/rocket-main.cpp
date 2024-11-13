@@ -232,16 +232,20 @@ int main(int argc, char **argv) {
 
   char **argOut = argv + 1;
   for (char **arg = argv + 1, **argEnd = argv + argc; arg != argEnd; ++arg) {
+#ifdef RUN_ARC
     if (strcmp(*arg, "--arcs") == 0) {
       optRunAll = false;
       optRunArcs = true;
       continue;
     }
+#endif
+#ifdef RUN_VTOR
     if (strcmp(*arg, "--vtor") == 0) {
       optRunAll = false;
       optRunVtor = true;
       continue;
     }
+#endif
     if (strcmp(*arg, "--trace") == 0) {
       ++arg;
       if (arg == argEnd) {
@@ -258,8 +262,12 @@ int main(int argc, char **argv) {
   if (argc != 2) {
     std::cerr << "usage: " << argv[0] << " [options] <binary>\n";
     std::cerr << "options:\n";
+#ifdef RUN_ARC
     std::cerr << "  --arcs         run arcilator simulation\n";
+#endif
+#ifdef RUN_VTOR
     std::cerr << "  --vtor         run verilator simulation\n";
+#endif
     std::cerr << "  --trace <VCD>  write trace to <VCD> file\n";
     return 1;
   }
@@ -300,10 +308,14 @@ int main(int argc, char **argv) {
 
   // Allocate the simulation models.
   ComparingRocketModel model;
+#ifdef RUN_VTOR
   if (optRunAll || optRunVtor)
     model.models.push_back(makeVerilatorModel());
+#endif
+#ifdef RUN_ARC
   if (optRunAll || optRunArcs)
     model.models.push_back(makeArcilatorModel());
+#endif
   if (optVcdOutputFile)
     model.vcd_start(optVcdOutputFile);
 
