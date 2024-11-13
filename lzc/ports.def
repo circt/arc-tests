@@ -1,0 +1,5 @@
+PORT(in_i)
+PORT(cnt_o)
+PORT(empty_o)
+
+#undef PORT
