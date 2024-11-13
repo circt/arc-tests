@@ -25,7 +25,7 @@ public:
     }
   }
 
-  void eval() override { RocketSystem_eval(&model.storage[0]); }
+  void eval(bool advance_clock = false) override { RocketSystem_eval(&model.storage[0]); }
 
   Ports get_ports() override {
     return {

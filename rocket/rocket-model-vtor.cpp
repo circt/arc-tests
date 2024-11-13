@@ -29,7 +29,7 @@ public:
       model_vcd->dump(static_cast<uint64_t>(cycle));
   }
 
-  void eval() override { model.eval(); }
+  void eval(bool advance_clock = false) override { model.eval(); }
 
   Ports get_ports() override {
     return {

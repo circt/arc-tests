@@ -23,7 +23,17 @@ public:
       auto seconds = std::chrono::duration_cast<std::chrono::duration<double>>(
                          model->duration)
                          .count();
-      std::cerr << model->name << ": " << (cycle / seconds) << " Hz (" << seconds << "s total time)\n";
+      std::cerr << model->name << ": " << (cycle / seconds) << " Hz\n";
+      seconds = std::chrono::duration_cast<std::chrono::duration<double>>(
+                         model->clock_time)
+                         .count();
+      std::cerr << model->name << ": time in clock eval " << seconds << " sec ("
+                << (cycle / seconds) << " Hz)\n";
+      seconds = std::chrono::duration_cast<std::chrono::duration<double>>(
+                         model->passthrough_time)
+                         .count();
+      std::cerr << model->name << ": time in passthrough eval " << seconds <<
+                   " sec (" << (cycle / seconds) << " Hz)\n";
     }
   }
 
@@ -62,12 +72,16 @@ public:
       model->setA(A);
   }
 
-  void eval() override {
+  void eval(bool advance_clock = false) override {
     for (auto &model : models) {
       auto t_before = std::chrono::high_resolution_clock::now();
-      model->eval();
+      model->eval(advance_clock);
       auto t_after = std::chrono::high_resolution_clock::now();
       model->duration += t_after - t_before;
+      if (advance_clock)
+        model->clock_time += t_after - t_before;
+      else
+        model->passthrough_time += t_after - t_before;
     }
   }
 
