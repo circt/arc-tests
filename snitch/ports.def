@@ -1,0 +1,17 @@
+PORT(clk_i)
+PORT(rst_i)
+
+PORT(inst_valid_o)
+PORT(inst_addr_o)
+PORT(inst_ready_i)
+PORT(inst_data_i)
+
+PORT(mem_valid_o)
+PORT(mem_addr_o)
+PORT(mem_write_o)
+PORT(mem_wdata_o)
+PORT(mem_wstrb_o)
+PORT(mem_ready_i)
+PORT(mem_rdata_i)
+
+#undef PORT
