@@ -1,0 +1,5 @@
+PORT(A)
+PORT(G)
+PORT(Z)
+
+#undef PORT
