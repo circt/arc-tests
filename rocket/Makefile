@@ -38,6 +38,16 @@ TRACE ?= 0
 RUN_ARC ?= 1
 RUN_VTOR ?= 1
 
+BENCHMARK_MODE ?= 0
+BENCHMARK_OUT_FILE ?= $(BUILD_DIR)/measurements-A$(RUN_ARC)V$(RUN_VTOR)-$(shell date --iso=seconds).txt
+BENCHMARK_OUT_FILE := ${BENCHMARK_OUT_FILE}
+BENCHMARK_PREFIX ?=
+BENCHMARK_SUFFIX =
+ifeq ($(BENCHMARK_MODE),1)
+# BENCHMARK_PREFIX += sudo chrt -f 99 perf stat -ddd 
+	BENCHMARK_SUFFIX += >> $(BENCHMARK_OUT_FILE) 2>&1
+endif
+
 ifeq ($(RUN_ARC),1)
 	CXXFLAGS += -DRUN_ARC
 endif
@@ -59,31 +69,33 @@ endif
 
 $(BUILD_MODEL).fir: $(SOURCE_MODEL)-$(CONFIG).fir.gz
 	gzip -dc $< | sed 's/printf.*/skip/' > $@
+	echo "START: Current timestamp in milliseconds: ${shell date +%s%3N}" $(BENCHMARK_SUFFIX)
 
 $(BUILD_MODEL).mlir: $(BUILD_MODEL).fir
-	firtool --ir-hw $< -o $@
+	$(BENCHMARK_PREFIX) $(FIRTOOL) --ir-hw $< -o $@ $(BENCHMARK_SUFFIX)
 
 #===-------------------------------------------------------------------------===
 # Arcilator
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL)-arc.o $(BUILD_MODEL).json &: $(BUILD_MODEL).mlir $(shell which arcilator)
-	$(ARCILATOR) $< --state-file=$(BUILD_MODEL).json -o $(BUILD_MODEL)-arc.ll $(ARCILATOR_ARGS)
-	$(OPT) -O3 -S $(BUILD_MODEL)-arc.ll | $(LLC) -O3 --filetype=obj -o $(BUILD_MODEL)-arc.o
+	$(BENCHMARK_PREFIX) $(ARCILATOR) $< --state-file=$(BUILD_MODEL).json -o $(BUILD_MODEL)-arc.ll $(ARCILATOR_ARGS) $(BENCHMARK_SUFFIX)
+	$(BENCHMARK_PREFIX) $(OPT) -O1 -S $(BUILD_MODEL)-arc.ll -o $(BUILD_MODEL)-llvm.ll $(BENCHMARK_SUFFIX)
+	$(BENCHMARK_PREFIX) $(LLC) -O3 --filetype=obj $(BUILD_MODEL)-llvm.ll -o $(BUILD_MODEL)-arc.o $(BENCHMARK_SUFFIX)
 # objdump -d $(BUILD_MODEL)-arc.o > $(BUILD_MODEL)-arc.s
 
 $(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
-	python3 $(ARCILATOR_UTILS_ROOT)/arcilator-header-cpp.py $< --view-depth 1 > $@
+	$(BENCHMARK_PREFIX) python3 $(ARCILATOR_UTILS_ROOT)/arcilator-header-cpp.py $< --view-depth 1 > $@ $(BENCHMARK_SUFFIX)
 
 #===-------------------------------------------------------------------------===
 # Verilator
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL).sv: $(BUILD_MODEL).mlir
-	$(FIRTOOL) --lowering-options=disallowLocalVariables $< -o $@
+	$(BENCHMARK_PREFIX) $(FIRTOOL) --lowering-options=disallowLocalVariables $< -o $@ $(BENCHMARK_SUFFIX)
 
 $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h &: $(BUILD_MODEL).sv $(REPO_ROOT)/verilator-stubs.sv
-	$(VERILATOR) -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -O3 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS)
+	$(BENCHMARK_PREFIX) $(VERILATOR) -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -O3 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS) $(BENCHMARK_SUFFIX)
 	cp $(BUILD_MODEL)-vtor/Vrocket__ALL.a $(BUILD_MODEL)-vtor.a
 	cp $(BUILD_MODEL)-vtor/Vrocket.h $(BUILD_MODEL)-vtor.h
 
@@ -92,10 +104,10 @@ $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h &: $(BUILD_MODEL).sv $(REPO_ROOT)/ve
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL)-model-arc.o: $(SOURCE_MODEL)-model-arc.cpp $(SOURCE_MODEL)-model.h $(BUILD_MODEL)-arc.h
-	$(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -c $< -o $@
+	$(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -c $< -o $@ $(BENCHMARK_SUFFIX)
 
 $(BUILD_MODEL)-model-vtor.o: $(SOURCE_MODEL)-model-vtor.cpp $(SOURCE_MODEL)-model.h $(BUILD_MODEL)-vtor.h
-	$(CXX) $(CXXFLAGS) -I$(BUILD_DIR) -I/$(VERILATOR_ROOT)/include -c $< -o $@
+	$(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) -I$(BUILD_DIR) -I/$(VERILATOR_ROOT)/include -c $< -o $@ $(BENCHMARK_SUFFIX)
 
 MAIN_DEP_LIST := $(SOURCE_MODEL)-main.cpp
 ifeq ($(RUN_ARC),1)
@@ -107,11 +119,17 @@ ifeq ($(RUN_VTOR),1)
 endif
 
 $(BUILD_MODEL)-main: $(MAIN_DEP_LIST)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -I$(REPO_ROOT)/elfio $^ -o $@
+	$(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) $(LDFLAGS) -I$(REPO_ROOT)/elfio $^ -o $@ $(BENCHMARK_SUFFIX)
 
 #===-------------------------------------------------------------------------===
 # Convenience
 #===-------------------------------------------------------------------------===
+
+binary-size: $(BUILD_MODEL)-main
+	ls -al $(BUILD_DIR) $(BENCHMARK_SUFFIX)
+
+build: $(BUILD_MODEL)-main
+	echo "END: Current timestamp in milliseconds: ${shell date +%s%3N}" $(BENCHMARK_SUFFIX)
 
 run: $(BUILD_MODEL)-main
 	$(BUILD_MODEL)-main $(BINARY) $(RUN_ARGS)
