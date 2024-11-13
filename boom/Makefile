@@ -1,5 +1,5 @@
 CXX_OPT_LEVEL ?= -O3
-CXXFLAGS = $(CXX_OPT_LEVEL) -Wall -std=c++17 -no-pie
+CXXFLAGS = $(CXX_OPT_LEVEL) -std=c++17 -no-pie
 VERILATOR_ROOT ?= $(shell verilator -getenv VERILATOR_ROOT)
 ARCILATOR_UTILS_ROOT ?= $(dir $(shell which arcilator))
 mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
@@ -18,28 +18,31 @@ OPT ?= $(shell which opt)
 OPT := ${OPT}
 LLC ?= $(shell which llc)
 LLC := ${LLC}
+AR ?= $(shell which ar)
+AR := ${AR}
 
 BUILD_DIR ?= build/$(CONFIG)
-$(shell mkdir -p $(BUILD_DIR))
+$(shell mkdir -p ${mkfile_dir}/$(BUILD_DIR))
 
 SOURCE_MODEL ?= boom
-BUILD_MODEL ?= $(BUILD_DIR)/boom
+BUILD_MODEL ?= ${mkfile_dir}/$(BUILD_DIR)/boom
 
 ARCILATOR_ARGS ?= --mlir-timing --print-debug-info --mlir-pass-statistics
-VERILATOR_ARGS ?= -DPRINTF_COND=0 -DASSERT_VERBOSE_COND=0 -DSTOP_COND=0
+VERILATOR_ARGS ?= -DPRINTF_COND=0 -DASSERT_VERBOSE_COND=0 -DSTOP_COND=0 -Wno-WIDTH
 
 TRACE ?= 0
 RUN_ARC ?= 1
 RUN_VTOR ?= 1
 
 BENCHMARK_MODE ?= 0
-BENCHMARK_OUT_FILE ?= $(BUILD_DIR)/measurements-A$(RUN_ARC)V$(RUN_VTOR)-$(shell date --iso=seconds).txt
-BENCHMARK_OUT_FILE := ${BENCHMARK_OUT_FILE}
+BENCHMARK_OUT_FILE ?= ${mkfile_dir}/$(BUILD_DIR)/measurements-A$(RUN_ARC)V$(RUN_VTOR)-$(shell date --iso=seconds).txt
+BENCHMARK_OUT_DIR := $(dir $(BENCHMARK_OUT_FILE))
+$(shell mkdir -p $(BENCHMARK_OUT_DIR))
 BENCHMARK_PREFIX ?=
 BENCHMARK_SUFFIX =
 ifeq ($(BENCHMARK_MODE),1)
 # BENCHMARK_PREFIX += sudo chrt -f 99 perf stat -ddd 
-	BENCHMARK_SUFFIX += >> $(BENCHMARK_OUT_FILE) 2>&1
+	BENCHMARK_SUFFIX += 2>&1 | tee -a ${mkfile_dir}/$(BENCHMARK_OUT_FILE)
 endif
 
 ifeq ($(RUN_ARC),1)
@@ -74,12 +77,12 @@ $(BUILD_MODEL).mlir: $(BUILD_MODEL).fir
 
 $(BUILD_MODEL)-arc.o $(BUILD_MODEL).json &: $(BUILD_MODEL).mlir
 	$(BENCHMARK_PREFIX) $(ARCILATOR) $< --state-file=$(BUILD_MODEL).json -o $(BUILD_MODEL)-arc.ll $(ARCILATOR_ARGS) $(BENCHMARK_SUFFIX)
-	$(BENCHMARK_PREFIX) $(OPT) -O1 -S $(BUILD_MODEL)-arc.ll -o $(BUILD_MODEL)-llvm.ll $(BENCHMARK_SUFFIX)
+	$(BENCHMARK_PREFIX) $(OPT) $(CXX_OPT_LEVEL) -S $(BUILD_MODEL)-arc.ll -o $(BUILD_MODEL)-llvm.ll $(BENCHMARK_SUFFIX)
 	$(BENCHMARK_PREFIX) $(LLC) -O3 --filetype=obj $(BUILD_MODEL)-llvm.ll -o $(BUILD_MODEL)-arc.o $(BENCHMARK_SUFFIX)
 #objdump -d $(BUILD_MODEL)-arc.o > $(BUILD_MODEL)-arc.s
 
 $(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
-	$(BENCHMARK_PREFIX) python3 $(ARCILATOR_UTILS_ROOT)/arcilator-header-cpp.py $< --view-depth 1 > $@ $(BENCHMARK_SUFFIX)
+	python3 $(ARCILATOR_UTILS_ROOT)/arcilator-header-cpp.py $< --view-depth 1 > $@
 
 #===-------------------------------------------------------------------------===
 # Verilator
@@ -88,9 +91,12 @@ $(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
 $(BUILD_MODEL).sv: $(BUILD_MODEL).mlir
 	$(BENCHMARK_PREFIX) $(FIRTOOL) --lowering-options=disallowLocalVariables,mitigateVivadoArrayIndexConstPropBug $< -o $@ $(BENCHMARK_SUFFIX)
 
+VERILATOR_CPP_FLAGS = -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-sign-compare -Wno-uninitialized -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable -Wno-shadow -DVL_TIME_CONTEXT
+
 $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h &: $(BUILD_MODEL).sv $(REPO_ROOT)/verilator-stubs.sv
-	$(BENCHMARK_PREFIX) $(VERILATOR) -O3 -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ --build -j 0 -O3 -Wno-WIDTH -CFLAGS -DVL_TIME_CONTEXT $(VERILATOR_ARGS) $(BENCHMARK_SUFFIX)
-	cp $(BUILD_MODEL)-vtor/Vboom__ALL.a $(BUILD_MODEL)-vtor.a
+	$(BENCHMARK_PREFIX) $(VERILATOR) -O3 --noassert --x-assign fast --x-initial fast --threads 1 -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ -j 0 $(VERILATOR_ARGS) $(BENCHMARK_SUFFIX)
+	cd $(BUILD_MODEL)-vtor/ && $(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) $(VERILATOR_CPP_FLAGS) -c -I/$(VERILATOR_ROOT)/include *.cpp $(BENCHMARK_SUFFIX)
+	cd $(BUILD_MODEL)-vtor/ && $(BENCHMARK_PREFIX) $(AR) rcs $(BUILD_MODEL)-vtor.a *.o $(BENCHMARK_SUFFIX)
 	cp $(BUILD_MODEL)-vtor/Vboom.h $(BUILD_MODEL)-vtor.h
 
 #===-------------------------------------------------------------------------===
@@ -98,10 +104,10 @@ $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h &: $(BUILD_MODEL).sv $(REPO_ROOT)/ve
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL)-model-arc.o: $(SOURCE_MODEL)-model-arc.cpp $(SOURCE_MODEL)-model.h $(BUILD_MODEL)-arc.h
-	$(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -c $< -o $@ $(BENCHMARK_SUFFIX)
+	$(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I${mkfile_dir}/$(BUILD_DIR) -c $< -o $@ $(BENCHMARK_SUFFIX)
 
 $(BUILD_MODEL)-model-vtor.o: $(SOURCE_MODEL)-model-vtor.cpp $(SOURCE_MODEL)-model.h $(BUILD_MODEL)-vtor.h
-	$(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) -I$(BUILD_DIR) -I/$(VERILATOR_ROOT)/include -c $< -o $@ $(BENCHMARK_SUFFIX)
+	$(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) -I${mkfile_dir}/$(BUILD_DIR) -I/$(VERILATOR_ROOT)/include -c $< -o $@ $(BENCHMARK_SUFFIX)
 
 MAIN_DEP_LIST := $(SOURCE_MODEL)-main.cpp
 ifeq ($(RUN_ARC),1)
@@ -120,7 +126,7 @@ $(BUILD_MODEL)-main: $(MAIN_DEP_LIST)
 #===-------------------------------------------------------------------------===
 
 binary-size: $(BUILD_MODEL)-main
-	ls -al $(BUILD_DIR) $(BENCHMARK_SUFFIX)
+	ls -al ${mkfile_dir}/$(BUILD_DIR) $(BENCHMARK_SUFFIX)
 
 build: $(BUILD_MODEL)-main
 	echo "END: Current timestamp in milliseconds: ${shell date +%s%3N}" $(BENCHMARK_SUFFIX)
