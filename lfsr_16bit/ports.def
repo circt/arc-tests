@@ -1,0 +1,6 @@
+PORT(clk_i)
+PORT(rst_ni)
+PORT(en_i)
+PORT(out_o)
+
+#undef PORT
