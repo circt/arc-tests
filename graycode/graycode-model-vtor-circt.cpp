@@ -5,7 +5,7 @@
 
 namespace {
 class VerilatorGraycodeModel : public GraycodeModel {
-  VGraycodeCirct model;
+  Vgraycode__02dcirct model;
   std::unique_ptr<VerilatedVcdC> model_vcd;
 
 public:

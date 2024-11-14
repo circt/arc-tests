@@ -43,7 +43,7 @@ RUN_VTOR ?= 1
 RUN_VTOR_CIRCT ?= 1
 
 BENCHMARK_MODE ?= 0
-BENCHMARK_OUT_FILE ?= ${mkfile_dir}/$(BUILD_DIR)/measurements-A$(RUN_ARC)V$(RUN_VTOR)C$(RUN_VTOR_CIRCT)-$(shell date --iso=seconds).txt
+BENCHMARK_OUT_FILE ?= ${mkfile_dir}/$(BUILD_DIR)/measurements-A$(RUN_ARC)V$(RUN_VTOR)C$(RUN_VTOR_CIRCT)-$(shell date -u +"%Y-%m-%dT%H:%M:%SZ").txt
 BENCHMARK_OUT_DIR := $(dir $(BENCHMARK_OUT_FILE))
 $(shell mkdir -p $(BENCHMARK_OUT_DIR))
 BENCHMARK_PREFIX ?=
@@ -78,8 +78,8 @@ endif
 start:
 	echo "START: Current timestamp in milliseconds: ${shell date +%s%3N}" $(BENCHMARK_SUFFIX)
 
-build/graycode.mlir: design/graycode.sv $(CIRCT_VERILOG) start
-	$(BENCHMARK_PREFIX) $(CIRCT_VERILOG) design/graycode.sv --top=graycode -I./design -o $@ --mlir-print-debuginfo $(BENCHMARK_SUFFIX)
+$(BUILD_MODEL).mlir: $(mkfile_dir)/design/graycode.sv $(CIRCT_VERILOG) start
+	$(BENCHMARK_PREFIX) $(CIRCT_VERILOG) $(mkfile_dir)/design/graycode.sv --top=graycode -I./design -o $@ --mlir-print-debuginfo $(BENCHMARK_SUFFIX)
 
 #===-------------------------------------------------------------------------===
 # Arcilator
@@ -100,8 +100,8 @@ $(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
 
 VERILATOR_CPP_FLAGS = -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-sign-compare -Wno-uninitialized -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable -Wno-shadow -DVL_TIME_CONTEXT
 
-$(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h: design/graycode.sv start
-	$(BENCHMARK_PREFIX) $(VERILATOR) -O3 --noassert --x-assign fast --x-initial fast --threads 1 -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ -j 0 $(VERILATOR_ARGS) $(BENCHMARK_SUFFIX)
+$(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h: $(mkfile_dir)/design/graycode.sv start
+	$(BENCHMARK_PREFIX) $(VERILATOR) -O3 --noassert --x-assign fast --x-initial fast --threads 1 -sv -cc -Mdir $(BUILD_MODEL)-vtor $< -j 0 $(VERILATOR_ARGS) $(BENCHMARK_SUFFIX)
 	cd $(BUILD_MODEL)-vtor/ && $(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) $(VERILATOR_CPP_FLAGS) -c -I/$(VERILATOR_ROOT)/include *.cpp $(BENCHMARK_SUFFIX)
 	cd $(BUILD_MODEL)-vtor/ && $(BENCHMARK_PREFIX) $(AR) rcs $(BUILD_MODEL)-vtor.a *.o $(BENCHMARK_SUFFIX)
 	cp $(BUILD_MODEL)-vtor/VGraycode.h $(BUILD_MODEL)-vtor.h
@@ -113,11 +113,11 @@ $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h: design/graycode.sv start
 $(BUILD_MODEL)-circt.sv: $(BUILD_MODEL).mlir
 	$(BENCHMARK_PREFIX) $(FIRTOOL) --lowering-options=disallowLocalVariables $< -o $@ $(BENCHMARK_SUFFIX)
 
-$(BUILD_MODEL)-vtor-circt.a $(BUILD_MODEL)-vtor-circt.h: $(BUILD_MODEL)-circt.sv $(REPO_ROOT)/EICG_wrapper.v
+$(BUILD_MODEL)-vtor-circt.a $(BUILD_MODEL)-vtor-circt.h: $(BUILD_MODEL)-circt.sv
 	$(BENCHMARK_PREFIX) $(VERILATOR) -O3 --noassert --x-assign fast --x-initial fast --threads 1 -sv -cc -Mdir $(BUILD_MODEL)-vtor-circt $^ -j 0 $(VERILATOR_ARGS) $(BENCHMARK_SUFFIX)
 	cd $(BUILD_MODEL)-vtor-circt/ && $(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) $(VERILATOR_CPP_FLAGS) -c -I/$(VERILATOR_ROOT)/include *.cpp $(BENCHMARK_SUFFIX)
 	cd $(BUILD_MODEL)-vtor-circt/ && $(BENCHMARK_PREFIX) $(AR) rcs $(BUILD_MODEL)-vtor-circt.a *.o $(BENCHMARK_SUFFIX)
-	cp $(BUILD_MODEL)-vtor-circt/VGraycodeCirct.h $(BUILD_MODEL)-vtor-circt.h
+	cp $(BUILD_MODEL)-vtor-circt/Vgraycode__02dcirct.h $(BUILD_MODEL)-vtor-circt.h
 
 #===-------------------------------------------------------------------------===
 # Testbench
@@ -142,9 +142,9 @@ endif
 ifeq ($(RUN_VTOR_CIRCT),1)
 	MAIN_DEP_LIST += $(BUILD_MODEL)-model-vtor-circt.o $(BUILD_MODEL)-vtor-circt.a 
 endif
-ifeq ($(filter 1, $(RUN_VTOR_CIRCT) $(RUN_VTOR)),1)
-  MAIN_DEP_LIST += $(VERILATOR_ROOT)/include/verilated.cpp $(VERILATOR_ROOT)/include/verilated_vcd_c.cpp $(VERILATOR_ROOT)/include/verilated_threads.cpp
-endif
+#ifeq ($(filter 1, $(RUN_VTOR_CIRCT) $(RUN_VTOR)),1)
+MAIN_DEP_LIST += $(VERILATOR_ROOT)/include/verilated.cpp $(VERILATOR_ROOT)/include/verilated_vcd_c.cpp $(VERILATOR_ROOT)/include/verilated_threads.cpp
+#endif
 
 $(BUILD_MODEL)-main: $(MAIN_DEP_LIST)
 	$(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) $(LDFLAGS) -I$(REPO_ROOT)/elfio $^ -o $@ $(BENCHMARK_SUFFIX)
@@ -184,4 +184,4 @@ benchmark-vtor-circt: RUN_ARGS += --vtor-circt
 benchmark-vtor-circt: benchmark
 
 hyperfine: $(BUILD_MODEL)-main
-	hyperfine --show-output --warmup=3 "$(BUILD_MODEL)-main $(BINARY) --arcs" "$(BUILD_MODEL)-main $(BINARY) --vtor"
+	hyperfine --warmup=3 "$(BUILD_MODEL)-main $(BINARY) --arcs" "$(BUILD_MODEL)-main $(BINARY) --vtor" "$(BUILD_MODEL)-main $(BINARY) --vtor-circt"

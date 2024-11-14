@@ -190,7 +190,7 @@ int main(int argc, char **argv) {
   //===--------------------------------------------------------------------===//
 
   size_t num_bad_cycles = 0;
-  for (unsigned i = 0; i < 500'000'000; ++i) {
+  for (unsigned i = 0; i < 100'000'000; ++i) {
     model.setA(i);
     model.clock();
 
