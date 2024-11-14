@@ -92,15 +92,14 @@ public:
       models[0]->get_inst(out);
   }
 
-  void set_mem(const MemInputs &in) override {
+  void set_data(const Data &in) override {
     for (auto &model : models)
-      model->set_mem(in);
+      model->set_data(in);
   }
 
-  MemOutputs get_mem() override {
-    if (models.empty())
-      return {};
-    return models[0]->get_mem();
+  void get_data(Data &out) override {
+    if (!models.empty())
+      models[0]->get_data(out);
   }
 
   void compare_ports() {
@@ -285,8 +284,31 @@ int main(int argc, char **argv) {
   //     data = -1;
   // };
 
+  auto handle_tohost = [&](uint32_t addr, uint64_t data) {
+    if (data == 1) {
+      finished = true;
+      std::cout << "Benchmark run successful!\n";
+      return;
+    } else if (data == SYS_write) {
+      for (int i = 0; i < TOHOST_DATA_SIZE; i += 8) {
+        uint64_t data = memory[TOHOST_DATA_ADDR + i];
+        unsigned char c[8];
+        *(uint64_t *)c = data;
+        for (int k = 0; k < 8; ++k) {
+          std::cout << c[k];
+          std::cout.flush();
+          if ((unsigned char)c[k] == 0)
+            return;
+        }
+      }
+    } else {
+      std::cerr << "cycle " << model.cycle << ": unsupported tohost write "
+                << data << "\n";
+    }
+  };
+
   size_t num_bad_cycles = 0;
-  for (unsigned i = 0; i < 1000; ++i) {
+  for (unsigned i = 0; i < 1000000; ++i) {
     // Service the instruction interface.
     Inst inst = {};
     model.get_inst(inst);
@@ -301,34 +323,35 @@ int main(int argc, char **argv) {
                   << inst.addr_o << std::dec << "\n";
       }
       inst.data_i = data >> ((inst.addr_o / 4) * 32);
-      std::cerr << "cycle " << model.cycle << ": fetched [0x" << std::hex
-                << inst.addr_o << "] = 0x" << inst.data_i << std::dec << "\n";
+      // std::cerr << "cycle " << model.cycle << ": fetched [0x" << std::hex
+      //           << inst.addr_o << "] = 0x" << inst.data_i << std::dec <<
+      //           "\n";
     }
     model.set_inst(inst);
 
-    // Service the memory interface.
-    // auto out = model.get_mem();
-    // MemInputs in = {};
-    // in.mem_ready_i = false;
-    // if (out.mem_valid_o) {
-    //   uint64_t &data = memory[out.mem_addr_o / 8 * 8];
-    //   if (out.mem_write_o) {
-    //     uint64_t mask = 0;
-    //     for (unsigned i = 0; i < 8; ++i)
-    //       if ((out.mem_wstrb_o >> i) & 1)
-    //         mask |= 0xFFull << (i * 8);
-    //     data = (data & ~mask) | (out.mem_wdata_o & mask);
-    //   }
-    //   in.mem_rdata_i = data;
-
-    //   const char *word = out.mem_write_o ? "writing" : "reading";
-    //   std::cerr << "cycle " << model.cycle << ": " << word << " [0x" <<
-    //   std::hex
-    //             << (out.mem_addr_o / 8 * 8) << "] m"
-    //             << (uint16_t)out.mem_wstrb_o << " = 0x" << data << std::dec
-    //             << "\n";
-    // }
-    // model.set_mem(in);
+    // Service the data interface.
+    Data data = {};
+    model.get_data(data);
+    data.ready_i = true;
+    if (data.valid_o) {
+      uint64_t &word = memory[data.addr_o / 8 * 8];
+      if (data.write_o) {
+        uint64_t mask = 0;
+        for (unsigned i = 0; i < 8; ++i)
+          if ((data.wstrb_o >> i) & 1)
+            mask |= 0xFFull << (i * 8);
+        word = (word & ~mask) | (data.wdata_o & mask);
+        if (data.addr_o == TOHOST_ADDR)
+          handle_tohost(data.addr_o, word);
+      }
+      data.rdata_i = word;
+      // const char *action = data.write_o ? "writing" : "reading";
+      // std::cerr << "cycle " << model.cycle << ": " << action << " [0x"
+      //           << std::hex << (data.addr_o / 8 * 8) << "] m"
+      //           << (uint16_t)data.wstrb_o << " = 0x" << word << std::dec
+      //           << "\n";
+    }
+    model.set_data(data);
 
     // Toggle the clock.
     model.clock();

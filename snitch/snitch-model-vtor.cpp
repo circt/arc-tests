@@ -52,19 +52,17 @@ public:
     out.addr_o = model.inst_addr_o;
   }
 
-  void set_mem(const MemInputs &in) override {
-    model.mem_ready_i = in.mem_ready_i;
-    model.mem_rdata_i = in.mem_rdata_i;
+  void set_data(const Data &in) override {
+    model.mem_ready_i = in.ready_i;
+    model.mem_rdata_i = in.rdata_i;
   }
 
-  MemOutputs get_mem() override {
-    MemOutputs out;
-    out.mem_valid_o = model.mem_valid_o;
-    out.mem_addr_o = model.mem_addr_o;
-    out.mem_write_o = model.mem_write_o;
-    out.mem_wdata_o = model.mem_wdata_o;
-    out.mem_wstrb_o = model.mem_wstrb_o;
-    return out;
+  void get_data(Data &out) override {
+    out.valid_o = model.mem_valid_o;
+    out.addr_o = model.mem_addr_o;
+    out.write_o = model.mem_write_o;
+    out.wdata_o = model.mem_wdata_o;
+    out.wstrb_o = model.mem_wstrb_o;
   }
 };
 } // namespace

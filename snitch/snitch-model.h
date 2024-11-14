@@ -8,6 +8,7 @@
 #include <string_view>
 #include <vector>
 
+/// Signals for the instruction interface.
 struct Inst {
   bool valid_o;
   uint32_t addr_o;
@@ -15,17 +16,15 @@ struct Inst {
   uint32_t data_i;
 };
 
-struct MemInputs {
-  bool mem_ready_i;
-  uint64_t mem_rdata_i;
-};
-
-struct MemOutputs {
-  bool mem_valid_o;
-  uint32_t mem_addr_o;
-  bool mem_write_o;
-  uint64_t mem_wdata_o;
-  uint8_t mem_wstrb_o;
+/// Signals for the data interface.
+struct Data {
+  bool valid_o;
+  uint32_t addr_o;
+  bool write_o;
+  uint64_t wdata_o;
+  uint8_t wstrb_o;
+  bool ready_i;
+  uint64_t rdata_i;
 };
 
 /// Abstract interface to an Arcilator or Verilator model.
@@ -47,10 +46,10 @@ public:
   virtual Ports get_ports() { return {}; }
   virtual void set_clock(bool clock) = 0;
   virtual void set_reset(bool reset) = 0;
-  virtual void set_inst(const Inst &in) {}
-  virtual void get_inst(Inst &out) {}
-  virtual void set_mem(const MemInputs &in) {}
-  virtual MemOutputs get_mem() { return {}; }
+  virtual void set_inst(const Inst &in) = 0;
+  virtual void get_inst(Inst &out) = 0;
+  virtual void set_data(const Data &in) = 0;
+  virtual void get_data(Data &out) = 0;
 
   const char *name = "unknown";
   std::chrono::high_resolution_clock::duration duration =
