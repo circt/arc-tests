@@ -47,7 +47,7 @@ module snitch_th (
 	) i_snitch (
 		.clk_i,
 		.rst_i,
-		.hart_id_i(32'hd0),
+		.hart_id_i(32'd0),
 
 		.inst_addr_o,
 		.inst_data_i,
@@ -115,6 +115,51 @@ module snitch_th (
   //     inst_ready_i = mem_ready_i;
   //   end
   // end
+
+  // Data request handling.
+  logic req_valid = '0, req_valid_next;
+  logic [31:0] req_addr = '0, req_addr_next;
+  logic [63:0] req_data = '0, req_data_next;
+  logic [7:0] req_strb = '0, req_strb_next;
+  logic req_write = '0, req_write_next;
+
+  assign req_valid_next = ~req_valid ? data_qvalid_o : req_valid & ~data_qready_i;
+  assign req_addr_next = data_qready_i ? data_qaddr_o : req_addr;
+  assign req_data_next = data_qready_i ? data_qdata_o : req_data;
+  assign req_strb_next = data_qready_i ? data_qstrb_o : req_strb;
+  assign req_write_next = data_qready_i ? data_qwrite_o : req_write;
+
+  always_ff @(posedge clk_i) begin
+    req_valid <= req_valid_next;
+    req_addr <= req_addr_next;
+    req_data <= req_data_next;
+    req_strb <= req_strb_next;
+    req_write <= req_write_next;
+  end
+
+  assign mem_valid_o = req_valid;
+  assign mem_addr_o = req_addr;
+  assign mem_wdata_o = req_data;
+  assign mem_wstrb_o = req_strb;
+  assign mem_write_o = req_write;
+
+  // Data response handling.
+  logic rsp_valid = '0, rsp_valid_next;
+  logic [63:0] rsp_data = '0, rsp_data_next;
+
+  assign rsp_valid_next = mem_valid_o & mem_ready_i ? '1 : rsp_valid & ~data_pready_o;
+  assign rsp_data_next = mem_valid_o & mem_ready_i ? mem_rdata_i : rsp_data;
+
+  always_ff @(posedge clk_i) begin
+    rsp_valid <= rsp_valid_next;
+    rsp_data <= rsp_data_next;
+  end
+
+  assign data_pvalid_i = rsp_valid;
+  assign data_pdata_i = rsp_data;
+  assign data_perror_i = '0;
+
+  assign data_qready_i = ~req_valid | mem_ready_i;
 
   // logic pick_data = 0;
 

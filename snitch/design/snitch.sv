@@ -2139,7 +2139,7 @@ module snitch #(
     write_rd = 1'b1;
     // if we are writing the field this cycle we need
     // an int destination register
-    uses_rd = write_rd;
+    uses_rd = 1'b1;
 
     rd_bypass = '0;
     zero_lsb = 1'b0;
@@ -3413,11 +3413,12 @@ module snitch #(
     endcase
 
     // Sanitize illegal instructions
-    if (illegal_inst) begin
-     write_rd = 1'b0;
-     uses_rd = 1'b0;
-     next_pc = Exception;
-    end
+    // TODO: Re-enable this once mem2reg within procedures works.
+    // if (illegal_inst) begin
+    //  write_rd = 1'b0;
+    //  uses_rd = 1'b0;
+    //  next_pc = Exception;
+    // end
   end
 
   // CSR logic
@@ -4030,7 +4031,7 @@ module fifo_v3 #(
         if (pop_i && ~empty_o) begin
             // read from the queue is a default assignment
             // but increment the read pointer...
-            if (read_pointer_n == FIFO_DEPTH[ADDR_DEPTH-1:0] - 1)
+            if (read_pointer_q == FIFO_DEPTH[ADDR_DEPTH-1:0] - 1)
                 read_pointer_n = '0;
             else
                 read_pointer_n = read_pointer_q + 1;
@@ -4054,31 +4055,50 @@ module fifo_v3 #(
     end
 
     // sequential process
-    always_ff @(posedge clk_i or negedge rst_ni) begin
+    always_ff @(posedge clk_i) begin
         if(~rst_ni) begin
             read_pointer_q  <= '0;
             write_pointer_q <= '0;
             status_cnt_q    <= '0;
         end else begin
-            if (flush_i) begin
-                read_pointer_q  <= '0;
-                write_pointer_q <= '0;
-                status_cnt_q    <= '0;
-             end else begin
-                read_pointer_q  <= read_pointer_n;
-                write_pointer_q <= write_pointer_n;
-                status_cnt_q    <= status_cnt_n;
-            end
+            read_pointer_q  <= flush_i ? '0 : read_pointer_n;
+            write_pointer_q <= flush_i ? '0 : write_pointer_n;
+            status_cnt_q    <= flush_i ? '0 : status_cnt_n;
         end
     end
+    // TODO: Re-enable the original below:
+    // always_ff @(posedge clk_i or negedge rst_ni) begin
+    //     if(~rst_ni) begin
+    //         read_pointer_q  <= '0;
+    //         write_pointer_q <= '0;
+    //         status_cnt_q    <= '0;
+    //     end else begin
+    //         if (flush_i) begin
+    //             read_pointer_q  <= '0;
+    //             write_pointer_q <= '0;
+    //             status_cnt_q    <= '0;
+    //          end else begin
+    //             read_pointer_q  <= read_pointer_n;
+    //             write_pointer_q <= write_pointer_n;
+    //             status_cnt_q    <= status_cnt_n;
+    //         end
+    //     end
+    // end
 
-    always_ff @(posedge clk_i or negedge rst_ni) begin
+    always_ff @(posedge clk_i) begin
         if(~rst_ni) begin
             mem_q <= '0;
-        end else if (!gate_clock) begin
-            mem_q <= mem_n;
+        end else begin
+            mem_q <= !gate_clock ? mem_n : mem_q;
         end
     end
+    // always_ff @(posedge clk_i or negedge rst_ni) begin
+    //     if(~rst_ni) begin
+    //         mem_q <= '0;
+    //     end else if (!gate_clock) begin
+    //         mem_q <= mem_n;
+    //     end
+    // end
 
 // pragma translate_off
 // `ifndef VERILATOR
