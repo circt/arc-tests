@@ -151,31 +151,33 @@ def benchmark_simulation_performance(config: Config, uniquifier: string, cxx_opt
     build_dir = f'./build/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}-simperf/'
     invoke_make(config, "build", measurement_file, build_dir, cxx_opt_level)
     rocket_or_boom = "rocket" if config.design.is_rocket() else "boom"
+    design = "snitch" if config.design.is_snitch() else rocket_or_boom
 
     binary = "benchmarks/dhrystone_rv32i.riscv" if config.design.is_snitch() else "benchmarks/dhrystone_rv64gcv.riscv"
 
     # Warmup
     for i in range(3):
-        subprocess.call(f'{rocket_or_boom}/{build_dir}{rocket_or_boom}-main {binary} 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
+        subprocess.call(f'{design}/{build_dir}{design}-main {binary} 2>&1 | tee -a {design}/{measurement_file}', shell=True)
 
     # Runs
     for i in range(10):
-        subprocess.call(f'{rocket_or_boom}/{build_dir}{rocket_or_boom}-main {binary} 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
+        subprocess.call(f'{design}/{build_dir}{design}-main {binary} 2>&1 | tee -a {design}/{measurement_file}', shell=True)
 
 def collect_hardware_counter_info(config: Config, uniquifier: string, cxx_opt_level = "-O3"):
     measurement_file = f'./measurements/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}/hardware-counters.txt'
     build_dir = f'./build/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}-hardware-counters/'
     invoke_make(config, "build", measurement_file, build_dir, cxx_opt_level)
     rocket_or_boom = "rocket" if config.design.is_rocket() else "boom"
+    design = "snitch" if config.design.is_snitch() else rocket_or_boom
 
     binary = "benchmarks/dhrystone_rv32i.riscv" if config.design.is_snitch() else "benchmarks/dhrystone_rv64gcv.riscv"
 
     # Warmup
-    subprocess.call(f'perf stat -ddd {rocket_or_boom}/{build_dir}{rocket_or_boom}-main {binary} 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
+    subprocess.call(f'perf stat -ddd {design}/{build_dir}{design}-main {binary} 2>&1 | tee -a {design}/{measurement_file}', shell=True)
 
     # Runs
     for i in range(10):
-      subprocess.call(f'perf stat -ddd {rocket_or_boom}/{build_dir}{rocket_or_boom}-main {binary} 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
+      subprocess.call(f'perf stat -ddd {design}/{build_dir}{design}-main {binary} 2>&1 | tee -a {design}/{measurement_file}', shell=True)
 
 def benchmark_simulation_performance_all():
     for design in [Design.Snitch]:
