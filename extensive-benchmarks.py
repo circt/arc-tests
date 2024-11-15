@@ -116,7 +116,7 @@ rocket_designs = [
     Design.RocketDualLarge,
 ]
 
-all_designs = boom_designs + rocket_designs + Design.Snitch
+all_designs = boom_designs + rocket_designs + [Design.Snitch]
 
 def collect_binary_size():
     for design in [Design.Snitch]:

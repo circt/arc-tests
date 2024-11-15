@@ -35,7 +35,7 @@ SOURCE_MODEL ?= snitch
 BUILD_MODEL ?= ${mkfile_dir}/$(BUILD_DIR)/snitch
 
 ARCILATOR_ARGS ?= --mlir-timing --mlir-pass-statistics
-VERILATOR_ARGS ?= -DPRINTF_COND=0 -DASSERT_VERBOSE_COND=0 -DSTOP_COND=0 -Wno-ASCRANGE -Wno-WIDTHCONCAT -Wno-CASEINCOMPLETE -Wno-LATCH
+VERILATOR_ARGS ?= -DPRINTF_COND=0 -DASSERT_VERBOSE_COND=0 -DSTOP_COND=0 -Wno-ASCRANGE -Wno-WIDTHCONCAT -Wno-CASEINCOMPLETE -Wno-LATCH -Wno-WIDTHEXPAND
 
 TRACE ?= 0
 RUN_ARC ?= 1
@@ -43,7 +43,7 @@ RUN_VTOR ?= 1
 RUN_VTOR_CIRCT ?= 1
 
 BENCHMARK_MODE ?= 0
-BENCHMARK_OUT_FILE ?= ${mkfile_dir}/$(BUILD_DIR)/measurements-A$(RUN_ARC)V$(RUN_VTOR)C$(RUN_VTOR_CIRCT)-$(shell date date +%s%3N).txt
+BENCHMARK_OUT_FILE ?= ${mkfile_dir}/$(BUILD_DIR)/measurements-A$(RUN_ARC)V$(RUN_VTOR)C$(RUN_VTOR_CIRCT)-$(shell date +%s%3N).txt
 BENCHMARK_OUT_DIR := $(dir $(BENCHMARK_OUT_FILE))
 $(shell mkdir -p $(BENCHMARK_OUT_DIR))
 BENCHMARK_SUFFIX =
@@ -84,7 +84,7 @@ $(BUILD_MODEL).mlir: ${mkfile_dir}/design/snitch_th.sv ${mkfile_dir}/design/snit
 $(BUILD_MODEL)-arc.o $(BUILD_MODEL).json: $(BUILD_MODEL).mlir $(ARCILATOR)
 	$(ARCILATOR) $< --state-file=$(BUILD_MODEL).json -o $(BUILD_MODEL)-arc.ll $(ARCILATOR_ARGS) $(BENCHMARK_SUFFIX)
 	$(OPT) $(CXX_OPT_LEVEL) --strip-debug -S $(BUILD_MODEL)-arc.ll -o $(BUILD_MODEL)-llvm.ll $(BENCHMARK_SUFFIX)
-	$(LLC) $(CXX_OPT_LEVEL) --filetype=obj -o $(BUILD_MODEL)-arc.o $(BENCHMARK_SUFFIX)
+	$(LLC) $(CXX_OPT_LEVEL) --filetype=obj $(BUILD_MODEL)-llvm.ll -o $(BUILD_MODEL)-arc.o $(BENCHMARK_SUFFIX)
 #	objdump -d $(BUILD_MODEL)-arc.o > $(BUILD_MODEL)-arc.s
 
 $(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
