@@ -1,10 +1,27 @@
+CXX_OPT_LEVEL ?= -O3
+CXXFLAGS = $(CXX_OPT_LEVEL) -std=c++17
 VERILATOR_ROOT ?= $(shell verilator -getenv VERILATOR_ROOT)
-mkfile_path := $(dir $(MAKEFILE_LIST))
-REPO_ROOT := ..
 ARCILATOR_UTILS_ROOT ?= $(dir $(shell which arcilator))
+mkfile_path := $(abspath $(lastword $(MAKEFILE_LIST)))
+mkfile_dir := $(dir $(mkfile_path))
+REPO_ROOT := $(mkfile_dir)..
 BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone_rv32i.riscv
 
-CXXFLAGS = -O3 -Wall -std=c++17
+CIRCT_VERILOG ?= $(shell which circt-verilog)
+CIRCT_VERILOG := ${CIRCT_VERILOG}
+ARCILATOR ?= $(shell which arcilator)
+ARCILATOR := ${ARCILATOR}
+VERILATOR ?= $(shell which verilator)
+VERILATOR := ${VERILATOR}
+FIRTOOL ?= $(shell which firtool)
+FIRTOOL := ${FIRTOOL}
+OPT ?= $(shell which opt)
+OPT := ${OPT}
+LLC ?= $(shell which llc)
+LLC := ${LLC}
+AR ?= $(shell which ar)
+AR := ${AR}
+
 LDFLAGS =
 ifeq ($(shell uname), Linux)
 	CXXFLAGS += -no-pie
@@ -12,15 +29,37 @@ ifeq ($(shell uname), Linux)
 endif
 
 BUILD_DIR ?= build
-$(shell mkdir -p $(BUILD_DIR))
+$(shell mkdir -p ${mkfile_dir}/$(BUILD_DIR))
 
 SOURCE_MODEL ?= snitch
-BUILD_MODEL ?= $(BUILD_DIR)/snitch
+BUILD_MODEL ?= ${mkfile_dir}/$(BUILD_DIR)/snitch
 
-ARCILATOR_ARGS ?= --mlir-timing --print-debug-info --mlir-pass-statistics
+ARCILATOR_ARGS ?= --mlir-timing --mlir-pass-statistics
 VERILATOR_ARGS ?= -DPRINTF_COND=0 -DASSERT_VERBOSE_COND=0 -DSTOP_COND=0 -Wno-ASCRANGE -Wno-WIDTHCONCAT -Wno-CASEINCOMPLETE -Wno-LATCH
 
 TRACE ?= 0
+RUN_ARC ?= 1
+RUN_VTOR ?= 1
+RUN_VTOR_CIRCT ?= 1
+
+BENCHMARK_MODE ?= 0
+BENCHMARK_OUT_FILE ?= ${mkfile_dir}/$(BUILD_DIR)/measurements-A$(RUN_ARC)V$(RUN_VTOR)C$(RUN_VTOR_CIRCT)-$(shell date date +%s%3N).txt
+BENCHMARK_OUT_DIR := $(dir $(BENCHMARK_OUT_FILE))
+$(shell mkdir -p $(BENCHMARK_OUT_DIR))
+BENCHMARK_SUFFIX =
+ifeq ($(BENCHMARK_MODE),1)
+	BENCHMARK_SUFFIX += 2>&1 | tee -a ${mkfile_dir}/$(BENCHMARK_OUT_FILE)
+endif
+
+ifeq ($(RUN_ARC),1)
+	CXXFLAGS += -DRUN_ARC
+endif
+ifeq ($(RUN_VTOR),1)
+	CXXFLAGS += -DRUN_VTOR
+endif
+ifeq ($(RUN_VTOR_CIRCT),1)
+	CXXFLAGS += -DRUN_VTOR_CIRCT
+endif
 
 ifeq ($(TRACE),1)
 	ARCILATOR_ARGS += --observe-wires --observe-ports --observe-named-values --observe-registers --observe-memories
@@ -34,17 +73,19 @@ endif
 # SystemVerilog to HW
 #===-------------------------------------------------------------------------===
 
-build/snitch.mlir: design/snitch_th.sv design/snitch.sv $(shell which circt-verilog)
-	circt-verilog design/snitch_th.sv design/snitch.sv --top=snitch_th -I./design -o $@ --mlir-print-debuginfo
+$(BUILD_MODEL).mlir: ${mkfile_dir}/design/snitch_th.sv ${mkfile_dir}/design/snitch.sv $(CIRCT_VERILOG)
+	echo "START: Current timestamp in milliseconds: ${shell date +%s%3N}" $(BENCHMARK_SUFFIX)
+	$(CIRCT_VERILOG) ${mkfile_dir}/design/snitch_th.sv ${mkfile_dir}/design/snitch.sv --top=snitch_th -I./design -o $@ $(BENCHMARK_SUFFIX)
 
 #===-------------------------------------------------------------------------===
 # Arcilator
 #===-------------------------------------------------------------------------===
 
-$(BUILD_MODEL)-arc.o $(BUILD_MODEL).json: $(BUILD_MODEL).mlir $(shell which arcilator)
-	arcilator $< --state-file=$(BUILD_MODEL).json -o $(BUILD_MODEL)-arc.ll $(ARCILATOR_ARGS)
-	opt -O3 -S $(BUILD_MODEL)-arc.ll | llc -O3 --filetype=obj -o $(BUILD_MODEL)-arc.o
-	objdump -d $(BUILD_MODEL)-arc.o > $(BUILD_MODEL)-arc.s
+$(BUILD_MODEL)-arc.o $(BUILD_MODEL).json: $(BUILD_MODEL).mlir $(ARCILATOR)
+	$(ARCILATOR) $< --state-file=$(BUILD_MODEL).json -o $(BUILD_MODEL)-arc.ll $(ARCILATOR_ARGS) $(BENCHMARK_SUFFIX)
+	$(OPT) $(CXX_OPT_LEVEL) --strip-debug -S $(BUILD_MODEL)-arc.ll -o $(BUILD_MODEL)-llvm.ll $(BENCHMARK_SUFFIX)
+	$(LLC) $(CXX_OPT_LEVEL) --filetype=obj -o $(BUILD_MODEL)-arc.o $(BENCHMARK_SUFFIX)
+#	objdump -d $(BUILD_MODEL)-arc.o > $(BUILD_MODEL)-arc.s
 
 $(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
 	python3 $(ARCILATOR_UTILS_ROOT)/arcilator-header-cpp.py $< --view-depth 1 > $@
@@ -53,9 +94,10 @@ $(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
 # Verilator
 #===-------------------------------------------------------------------------===
 
-$(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h: design/snitch_th.sv design/snitch.sv
-	verilator -sv -cc -Mdir $(BUILD_MODEL)-vtor -top snitch_th -prefix VSnitch $^ -Idesign --build -j 0 -Wno-WIDTH $(VERILATOR_ARGS)
-	cp $(BUILD_MODEL)-vtor/VSnitch__ALL.a $(BUILD_MODEL)-vtor.a
+$(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h: ${mkfile_dir}/design/snitch_th.sv ${mkfile_dir}/design/snitch.sv
+	$(VERILATOR) -O3 --noassert --x-assign fast --x-initial fast -top snitch_th -prefix VSnitch -Idesign --threads 1 -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ -j 0 $(VERILATOR_ARGS) $(BENCHMARK_SUFFIX)
+	cd $(BUILD_MODEL)-vtor/ && $(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) $(VERILATOR_CPP_FLAGS) -c -I/$(VERILATOR_ROOT)/include *.cpp $(BENCHMARK_SUFFIX)
+	cd $(BUILD_MODEL)-vtor/ && $(BENCHMARK_PREFIX) $(AR) rcs $(BUILD_MODEL)-vtor.a *.o $(BENCHMARK_SUFFIX)
 	cp $(BUILD_MODEL)-vtor/VSnitch.h $(BUILD_MODEL)-vtor.h
 
 #===-------------------------------------------------------------------------===
@@ -63,11 +105,12 @@ $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h: design/snitch_th.sv design/snitch.s
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL)-circt.sv: $(BUILD_MODEL).mlir
-	firtool --lowering-options=disallowLocalVariables $< -o $@
+	$(FIRTOOL) --lowering-options=disallowLocalVariables $< -o $@ $(BENCHMARK_SUFFIX)
 
 $(BUILD_MODEL)-vtor-circt.a $(BUILD_MODEL)-vtor-circt.h: $(BUILD_MODEL)-circt.sv $(REPO_ROOT)/EICG_wrapper.v
-	verilator -sv -cc -Mdir $(BUILD_MODEL)-vtor-circt -top snitch_th $^ -prefix VSnitchCirct -Idesign --build -j 0 -Wno-WIDTH $(VERILATOR_ARGS)
-	cp $(BUILD_MODEL)-vtor-circt/VSnitchCirct__ALL.a $(BUILD_MODEL)-vtor-circt.a
+	$(VERILATOR) -O3 --noassert --x-assign fast --x-initial fast -top snitch_th -prefix VSnitchCirct -Idesign --threads 1 -sv -cc -Mdir $(BUILD_MODEL)-vtor-circt $^ -j 0 $(VERILATOR_ARGS) $(BENCHMARK_SUFFIX)
+	cd $(BUILD_MODEL)-vtor-circt/ && $(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) $(VERILATOR_CPP_FLAGS) -c -I/$(VERILATOR_ROOT)/include *.cpp $(BENCHMARK_SUFFIX)
+	cd $(BUILD_MODEL)-vtor-circt/ && $(BENCHMARK_PREFIX) $(AR) rcs $(BUILD_MODEL)-vtor-circt.a *.o $(BENCHMARK_SUFFIX)
 	cp $(BUILD_MODEL)-vtor-circt/VSnitchCirct.h $(BUILD_MODEL)-vtor-circt.h
 
 #===-------------------------------------------------------------------------===
@@ -75,20 +118,39 @@ $(BUILD_MODEL)-vtor-circt.a $(BUILD_MODEL)-vtor-circt.h: $(BUILD_MODEL)-circt.sv
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL)-model-arc.o: $(SOURCE_MODEL)-model-arc.cpp $(SOURCE_MODEL)-model.h $(BUILD_MODEL)-arc.h
-	$(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -c $< -o $@
+	$(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -c $< -o $@ $(BENCHMARK_SUFFIX)
 
 $(BUILD_MODEL)-model-vtor.o: $(SOURCE_MODEL)-model-vtor.cpp $(SOURCE_MODEL)-model.h $(BUILD_MODEL)-vtor.h
-	$(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -I/$(VERILATOR_ROOT)/include -c $< -o $@
+	$(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -I/$(VERILATOR_ROOT)/include -c $< -o $@ $(BENCHMARK_SUFFIX)
 
 $(BUILD_MODEL)-model-vtor-circt.o: $(SOURCE_MODEL)-model-vtor-circt.cpp $(SOURCE_MODEL)-model.h $(BUILD_MODEL)-vtor-circt.h
-	$(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -I/$(VERILATOR_ROOT)/include -c $< -o $@
+	$(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -I/$(VERILATOR_ROOT)/include -c $< -o $@ $(BENCHMARK_SUFFIX)
 
-$(BUILD_MODEL)-main: $(SOURCE_MODEL)-main.cpp $(BUILD_MODEL)-model-arc.o $(BUILD_MODEL)-arc.o $(BUILD_MODEL)-model-vtor.o $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-model-vtor-circt.o $(BUILD_MODEL)-vtor-circt.a $(VERILATOR_ROOT)/include/verilated.cpp $(VERILATOR_ROOT)/include/verilated_vcd_c.cpp $(VERILATOR_ROOT)/include/verilated_threads.cpp
-	$(CXX) $(CXXFLAGS) -g $(LDFLAGS) -I$(REPO_ROOT)/elfio $^ -o $@
+MAIN_DEP_LIST := $(SOURCE_MODEL)-main.cpp
+ifeq ($(RUN_ARC),1)
+	MAIN_DEP_LIST += $(BUILD_MODEL)-model-arc.o $(BUILD_MODEL)-arc.o
+endif
+ifeq ($(RUN_VTOR),1)
+	MAIN_DEP_LIST += $(BUILD_MODEL)-model-vtor.o $(BUILD_MODEL)-vtor.a
+  MAIN_DEP_LIST += $(VERILATOR_ROOT)/include/verilated.cpp $(VERILATOR_ROOT)/include/verilated_vcd_c.cpp $(VERILATOR_ROOT)/include/verilated_threads.cpp
+endif
+ifeq ($(RUN_VTOR_CIRCT),1)
+	MAIN_DEP_LIST += $(BUILD_MODEL)-model-vtor-circt.o $(BUILD_MODEL)-vtor-circt.a
+  MAIN_DEP_LIST += $(VERILATOR_ROOT)/include/verilated.cpp $(VERILATOR_ROOT)/include/verilated_vcd_c.cpp $(VERILATOR_ROOT)/include/verilated_threads.cpp
+endif
+
+$(BUILD_MODEL)-main: $(MAIN_DEP_LIST)
+	$(CXX) $(CXXFLAGS) -g $(LDFLAGS) -I$(REPO_ROOT)/elfio $^ -o $@ $(BENCHMARK_SUFFIX)
 
 #===-------------------------------------------------------------------------===
 # Convenience
 #===-------------------------------------------------------------------------===
+
+binary-size: $(BUILD_MODEL)-main
+	ls -al ${mkfile_dir}/$(BUILD_DIR) $(BENCHMARK_SUFFIX)
+
+build: $(BUILD_MODEL)-main
+	echo "END: Current timestamp in milliseconds: ${shell date +%s%3N}" $(BENCHMARK_SUFFIX)
 
 run: $(BUILD_MODEL)-main
 	$(BUILD_MODEL)-main $(BINARY) $(RUN_ARGS)
