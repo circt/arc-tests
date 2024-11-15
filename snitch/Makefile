@@ -95,6 +95,7 @@ $(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h: ${mkfile_dir}/design/snitch_th.sv ${mkfile_dir}/design/snitch.sv
+	echo "START: Current timestamp in milliseconds: ${shell date +%s%3N}" $(BENCHMARK_SUFFIX)
 	$(VERILATOR) -O3 --noassert --x-assign fast --x-initial fast -top snitch_th -prefix VSnitch -Idesign --threads 1 -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ -j 0 $(VERILATOR_ARGS) $(BENCHMARK_SUFFIX)
 	cd $(BUILD_MODEL)-vtor/ && $(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) $(VERILATOR_CPP_FLAGS) -c -I/$(VERILATOR_ROOT)/include *.cpp $(BENCHMARK_SUFFIX)
 	cd $(BUILD_MODEL)-vtor/ && $(BENCHMARK_PREFIX) $(AR) rcs $(BUILD_MODEL)-vtor.a *.o $(BENCHMARK_SUFFIX)
