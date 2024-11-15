@@ -41,7 +41,7 @@ class Design(IntEnum):
             return "large"
         elif self == Design.BoomMega:
             return "mega"
-        if self == Design.DualBoomSmall:
+        elif self == Design.DualBoomSmall:
             return "dual-small"
         elif self == Design.DualBoomLarge:
             return "dual-large"
@@ -61,12 +61,16 @@ class Design(IntEnum):
             return "dual-large-master"
         elif self == Design.Snitch:
             return "snitch"
+        elif self == Design.LFSR:
+            return "lfsr_16bit"
+        elif self == Design.Graycode:
+            return "graycode"
 
     def is_rocket(self) -> bool:
-        return int(self) >= 6
+        return int(self) in [6,7,8,9,10,11]
 
     def is_boom(self) -> bool:
-        return not self.is_rocket() and not self.is_snitch() and not self.is_lfsr() and not self.is_graycode()
+        return int(self) < 6
     
     def is_snitch(self) -> bool:
         return int(self) == 12
