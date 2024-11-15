@@ -78,7 +78,7 @@ endif
 start:
 	echo "START: Current timestamp in milliseconds: ${shell date +%s%3N}" $(BENCHMARK_SUFFIX)
 
-$(BUILD_MODEL).mlir: ${mkfile_dir}/design/lfsr_16bit.sv $(CIRCT_VERILOG)
+$(BUILD_MODEL).mlir: ${mkfile_dir}/design/lfsr_16bit.sv $(CIRCT_VERILOG) start
 	$(BENCHMARK_PREFIX) $(CIRCT_VERILOG) ${mkfile_dir}/design/lfsr_16bit.sv --top=lfsr_16bit -I./design -o $@ $(BENCHMARK_SUFFIX)
 
 #===-------------------------------------------------------------------------===
@@ -100,8 +100,8 @@ $(BUILD_MODEL)-arc.h: $(BUILD_MODEL).json
 
 VERILATOR_CPP_FLAGS = -DVM_COVERAGE=0 -DVM_SC=0 -DVM_TRACE=0 -DVM_TRACE_FST=0 -DVM_TRACE_VCD=0 -faligned-new -fcf-protection=none -Wno-bool-operation -Wno-sign-compare -Wno-uninitialized -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable -Wno-shadow -DVL_TIME_CONTEXT
 
-$(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h: design/lfsr_16bit.sv
-	$(BENCHMARK_PREFIX) $(VERILATOR) -prefix VLfsr_16bit -O3 --noassert --x-assign fast --x-initial fast --threads 1 -sv -cc -Mdir $(BUILD_MODEL)-vtor $^ -j 0 $(VERILATOR_ARGS) $(BENCHMARK_SUFFIX)
+$(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h: ${mkfile_dir}/design/lfsr_16bit.sv start
+	$(BENCHMARK_PREFIX) $(VERILATOR) -prefix VLfsr_16bit -O3 --noassert --x-assign fast --x-initial fast --threads 1 -sv -cc -Mdir $(BUILD_MODEL)-vtor $< -j 0 $(VERILATOR_ARGS) $(BENCHMARK_SUFFIX)
 	cd $(BUILD_MODEL)-vtor/ && $(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) $(VERILATOR_CPP_FLAGS) -c -I/$(VERILATOR_ROOT)/include *.cpp $(BENCHMARK_SUFFIX)
 	cd $(BUILD_MODEL)-vtor/ && $(BENCHMARK_PREFIX) $(AR) rcs $(BUILD_MODEL)-vtor.a *.o $(BENCHMARK_SUFFIX)
 	cp $(BUILD_MODEL)-vtor/VLfsr_16bit.h $(BUILD_MODEL)-vtor.h
