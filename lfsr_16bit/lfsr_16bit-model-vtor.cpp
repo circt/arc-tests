@@ -5,7 +5,7 @@
 
 namespace {
 class VerilatorLfsr_16bitModel : public Lfsr_16bitModel {
-  Vlfsr_16bit model;
+  VLfsr_16bit model;
   std::unique_ptr<VerilatedVcdC> model_vcd;
 
 public:
