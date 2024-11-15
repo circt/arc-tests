@@ -1,4 +1,5 @@
 #include "lfsr_16bit-model.h"
+#include <cstring>
 #include <cassert>
 #include <chrono>
 #include <cstdint>
