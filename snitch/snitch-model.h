@@ -42,7 +42,7 @@ public:
 
   virtual void vcd_start(const char *outputFile) = 0;
   virtual void vcd_dump(size_t cycle) = 0;
-  virtual void eval() = 0;
+  virtual void eval(bool advance_clock = false) = 0;
   virtual Ports get_ports() { return {}; }
   virtual void set_clock(bool clock) = 0;
   virtual void set_reset(bool reset) = 0;
@@ -53,6 +53,10 @@ public:
 
   const char *name = "unknown";
   std::chrono::high_resolution_clock::duration duration =
+      std::chrono::high_resolution_clock::duration::zero();
+  std::chrono::high_resolution_clock::duration clock_time =
+      std::chrono::high_resolution_clock::duration::zero();
+  std::chrono::high_resolution_clock::duration passthrough_time =
       std::chrono::high_resolution_clock::duration::zero();
 };
 

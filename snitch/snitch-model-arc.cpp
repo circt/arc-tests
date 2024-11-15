@@ -30,7 +30,7 @@ public:
     }
   }
 
-  void eval() override { snitch_th_eval(&model.storage[0]); }
+  void eval(bool advance_clock) override { snitch_th_eval(&model.storage[0]); }
 
   Ports get_ports() override {
     return {

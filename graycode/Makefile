@@ -34,7 +34,7 @@ $(shell mkdir -p ${mkfile_dir}/$(BUILD_DIR))
 SOURCE_MODEL ?= graycode
 BUILD_MODEL ?= ${mkfile_dir}/$(BUILD_DIR)/graycode
 
-ARCILATOR_ARGS ?= --mlir-timing --print-debug-info --mlir-pass-statistics
+ARCILATOR_ARGS ?= --mlir-timing --mlir-pass-statistics
 VERILATOR_ARGS ?= -DPRINTF_COND=0 -DASSERT_VERBOSE_COND=0 -DSTOP_COND=0 -Wno-ASCRANGE -Wno-WIDTHCONCAT -Wno-CASEINCOMPLETE -Wno-LATCH -Wno-UNOPTFLAT
 
 TRACE ?= 0
@@ -79,7 +79,7 @@ start:
 	echo "START: Current timestamp in milliseconds: ${shell date +%s%3N}" $(BENCHMARK_SUFFIX)
 
 $(BUILD_MODEL).mlir: $(mkfile_dir)/design/graycode.sv $(CIRCT_VERILOG) start
-	$(BENCHMARK_PREFIX) $(CIRCT_VERILOG) $(mkfile_dir)/design/graycode.sv --top=graycode -I./design -o $@ --mlir-print-debuginfo $(BENCHMARK_SUFFIX)
+	$(BENCHMARK_PREFIX) $(CIRCT_VERILOG) $(mkfile_dir)/design/graycode.sv --top=graycode -I./design -o $@ $(BENCHMARK_SUFFIX)
 
 #===-------------------------------------------------------------------------===
 # Arcilator
@@ -87,7 +87,7 @@ $(BUILD_MODEL).mlir: $(mkfile_dir)/design/graycode.sv $(CIRCT_VERILOG) start
 
 $(BUILD_MODEL)-arc.o $(BUILD_MODEL).json: $(BUILD_MODEL).mlir $(ARCILATOR)
 	$(BENCHMARK_PREFIX) $(ARCILATOR) $< --state-file=$(BUILD_MODEL).json -o $(BUILD_MODEL)-arc.ll $(ARCILATOR_ARGS) $(BENCHMARK_SUFFIX)
-	$(BENCHMARK_PREFIX) $(OPT) $(CXX_OPT_LEVEL) -S $(BUILD_MODEL)-arc.ll -o $(BUILD_MODEL)-llvm.ll $(BENCHMARK_SUFFIX)
+	$(BENCHMARK_PREFIX) $(OPT) $(CXX_OPT_LEVEL) --strip-debug -S $(BUILD_MODEL)-arc.ll -o $(BUILD_MODEL)-llvm.ll $(BENCHMARK_SUFFIX)
 	$(BENCHMARK_PREFIX) $(LLC) -O3 --filetype=obj $(BUILD_MODEL)-llvm.ll -o $(BUILD_MODEL)-arc.o $(BENCHMARK_SUFFIX)
 # objdump -d $(BUILD_MODEL)-arc.o > $(BUILD_MODEL)-arc.s
 
