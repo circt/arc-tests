@@ -30,6 +30,7 @@ class Design(IntEnum):
     RocketDualSmall = 9
     RocketDualMedium = 10
     RocketDualLarge = 11
+    Snitch = 12
 
     def to_string(self):
         if self == Design.BoomSmall:
@@ -56,12 +57,17 @@ class Design(IntEnum):
             return "dual-medium-master"
         elif self == Design.RocketDualLarge:
             return "dual-large-master"
+        elif self == Design.Snitch:
+            return "snitch"
 
     def is_rocket(self) -> bool:
         return int(self) >= 6
 
     def is_boom(self) -> bool:
         return not self.is_rocket()
+    
+    def is_snitch(self) -> bool:
+        return int(self) == 12
 
     def is_dual_core(self) -> bool:
         return int(self) in [3,4,5,9,10,11]
@@ -84,12 +90,13 @@ def invoke_make(config: Config, action: string, measurement_file: string, build_
     design = config.design
     simulator = config.sim
     rocket_or_boom = "rocket" if design.is_rocket() else "boom"
+    makefile_dir = "snitch" if design.is_snitch() else rocket_or_boom
     run_arcilator = "1" if simulator == Simulator.Arcilator else "0"
     run_verilator = "1" if simulator == Simulator.Verilator else "0"
     run_verilator_circt = "1" if simulator == Simulator.VerilatorCIRCT else "0"
 
     # Build the benchmark
-    subprocess.call(f'make -C {rocket_or_boom} {action} BENCHMARK_OUT_FILE={measurement_file} BENCHMARK_MODE=1 CXX_OPT_LEVEL={cxx_opt_level} BUILD_DIR={build_dir} CONFIG={design.to_string()} RUN_VTOR_CIRCT={run_verilator_circt} RUN_ARC={run_arcilator} RUN_VTOR={run_verilator}', shell=True)
+    subprocess.call(f'make -C {makefile_dir} {action} BENCHMARK_OUT_FILE={measurement_file} BENCHMARK_MODE=1 CXX_OPT_LEVEL={cxx_opt_level} BUILD_DIR={build_dir} CONFIG={design.to_string()} RUN_VTOR_CIRCT={run_verilator_circt} RUN_ARC={run_arcilator} RUN_VTOR={run_verilator}', shell=True)
 
 boom_designs = [
     Design.BoomMega,
@@ -109,13 +116,15 @@ rocket_designs = [
     Design.RocketDualLarge,
 ]
 
-all_designs = boom_designs + rocket_designs
+all_designs = boom_designs + rocket_designs + Design.Snitch
 
 def collect_binary_size():
-    for design in all_designs:
+    for design in [Design.Snitch]:
         config = Config(Simulator.Arcilator, design, "--mlir-timing -O3")
         invoke_make(config, "binary-size", f'./measurements/{config.sim.to_string()}-{design.to_string()}/binary-size.txt', f'./build/{config.sim.to_string()}-{design.to_string()}-binary-size/')
         config = Config(Simulator.Verilator, design, "-O3")
+        invoke_make(config, "binary-size", f'./measurements/{config.sim.to_string()}-{design.to_string()}/binary-size.txt', f'./build/{config.sim.to_string()}-{design.to_string()}-binary-size/')
+        config = Config(Simulator.VerilatorCIRCT, design, "-O3")
         invoke_make(config, "binary-size", f'./measurements/{config.sim.to_string()}-{design.to_string()}/binary-size.txt', f'./build/{config.sim.to_string()}-{design.to_string()}-binary-size/')
 
 def benchmark_compile_time(config: Config, uniquifier: string):
@@ -132,9 +141,10 @@ def benchmark_compile_time(config: Config, uniquifier: string):
         invoke_make(config, "build", measurement_file, build_dir)
 
 def benchmark_compile_time_all():
-    for design in all_designs:
+    for design in [Design.Snitch]:
         benchmark_compile_time(Config(Simulator.Arcilator, design, "-O3"), "O3")
         benchmark_compile_time(Config(Simulator.Verilator, design, "-O3"), "O3")
+        benchmark_compile_time(Config(Simulator.VerilatorCIRCT, design, "-O3"), "O3")
 
 def benchmark_simulation_performance(config: Config, uniquifier: string, cxx_opt_level = "-O3"):
     measurement_file = f'./measurements/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}/sim-perf.txt'
@@ -142,13 +152,15 @@ def benchmark_simulation_performance(config: Config, uniquifier: string, cxx_opt
     invoke_make(config, "build", measurement_file, build_dir, cxx_opt_level)
     rocket_or_boom = "rocket" if config.design.is_rocket() else "boom"
 
+    binary = "benchmarks/dhrystone_rv32i.riscv" if config.design.is_snitch() else "benchmarks/dhrystone_rv64gcv.riscv"
+
     # Warmup
     for i in range(3):
-        subprocess.call(f'{rocket_or_boom}/{build_dir}{rocket_or_boom}-main benchmarks/dhrystone_rv64gcv.riscv 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
+        subprocess.call(f'{rocket_or_boom}/{build_dir}{rocket_or_boom}-main {binary} 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
 
     # Runs
     for i in range(10):
-        subprocess.call(f'{rocket_or_boom}/{build_dir}{rocket_or_boom}-main benchmarks/dhrystone_rv64gcv.riscv 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
+        subprocess.call(f'{rocket_or_boom}/{build_dir}{rocket_or_boom}-main {binary} 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
 
 def collect_hardware_counter_info(config: Config, uniquifier: string, cxx_opt_level = "-O3"):
     measurement_file = f'./measurements/{config.sim.to_string()}-{config.design.to_string()}-{uniquifier}/hardware-counters.txt'
@@ -156,21 +168,26 @@ def collect_hardware_counter_info(config: Config, uniquifier: string, cxx_opt_le
     invoke_make(config, "build", measurement_file, build_dir, cxx_opt_level)
     rocket_or_boom = "rocket" if config.design.is_rocket() else "boom"
 
+    binary = "benchmarks/dhrystone_rv32i.riscv" if config.design.is_snitch() else "benchmarks/dhrystone_rv64gcv.riscv"
+
     # Warmup
-    subprocess.call(f'perf stat -ddd {rocket_or_boom}/{build_dir}{rocket_or_boom}-main benchmarks/dhrystone_rv64gcv.riscv 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
+    subprocess.call(f'perf stat -ddd {rocket_or_boom}/{build_dir}{rocket_or_boom}-main {binary} 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
 
     # Runs
-    subprocess.call(f'perf stat -ddd {rocket_or_boom}/{build_dir}{rocket_or_boom}-main benchmarks/dhrystone_rv64gcv.riscv 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
+    for i in range(10):
+      subprocess.call(f'perf stat -ddd {rocket_or_boom}/{build_dir}{rocket_or_boom}-main {binary} 2>&1 | tee -a {rocket_or_boom}/{measurement_file}', shell=True)
 
 def benchmark_simulation_performance_all():
-    for design in all_designs:
+    for design in [Design.Snitch]:
         benchmark_simulation_performance(Config(Simulator.Arcilator, design, "-O3"), "O3")
         benchmark_simulation_performance(Config(Simulator.Verilator, design, "-O3"), "O3")
+        benchmark_simulation_performance(Config(Simulator.VerilatorCIRCT, design, "-O3"), "O3")
 
 def collect_hardware_counter_info_all():
-    for design in all_designs:
+    for design in [Design.Snitch]:
         collect_hardware_counter_info(Config(Simulator.Arcilator, design, "-O3"), "O3")
         collect_hardware_counter_info(Config(Simulator.Verilator, design, "-O3"), "O3")
+        collect_hardware_counter_info(Config(Simulator.VerilatorCIRCT, design, "-O3"), "O3")
 
 if __name__ == "__main__":
     print("//----------------------------------------------//")
