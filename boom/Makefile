@@ -27,7 +27,7 @@ $(shell mkdir -p ${mkfile_dir}/$(BUILD_DIR))
 SOURCE_MODEL ?= boom
 BUILD_MODEL ?= ${mkfile_dir}/$(BUILD_DIR)/boom
 
-ARCILATOR_ARGS ?= --mlir-timing --print-debug-info --mlir-pass-statistics
+ARCILATOR_ARGS ?= --mlir-timing --mlir-pass-statistics
 VERILATOR_ARGS ?= -DPRINTF_COND=0 -DASSERT_VERBOSE_COND=0 -DSTOP_COND=0 -Wno-WIDTH
 
 TRACE ?= 0
@@ -77,7 +77,7 @@ $(BUILD_MODEL).mlir: $(BUILD_MODEL).fir
 
 $(BUILD_MODEL)-arc.o $(BUILD_MODEL).json &: $(BUILD_MODEL).mlir
 	$(BENCHMARK_PREFIX) $(ARCILATOR) $< --state-file=$(BUILD_MODEL).json -o $(BUILD_MODEL)-arc.ll $(ARCILATOR_ARGS) $(BENCHMARK_SUFFIX)
-	$(BENCHMARK_PREFIX) $(OPT) $(CXX_OPT_LEVEL) -S $(BUILD_MODEL)-arc.ll -o $(BUILD_MODEL)-llvm.ll $(BENCHMARK_SUFFIX)
+	$(BENCHMARK_PREFIX) $(OPT) --strip-debug $(CXX_OPT_LEVEL) -S $(BUILD_MODEL)-arc.ll -o $(BUILD_MODEL)-llvm.ll $(BENCHMARK_SUFFIX)
 	$(BENCHMARK_PREFIX) $(LLC) -O3 --filetype=obj $(BUILD_MODEL)-llvm.ll -o $(BUILD_MODEL)-arc.o $(BENCHMARK_SUFFIX)
 #objdump -d $(BUILD_MODEL)-arc.o > $(BUILD_MODEL)-arc.s
 
