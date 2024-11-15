@@ -8,20 +8,25 @@ class ArcilatorSnitchModel : public SnitchModel {
   snitch_th model;
   std::ofstream vcd_stream;
   std::unique_ptr<ValueChangeDump<snitch_thLayout>> model_vcd;
+  bool is_first_vcd_dump = true;
 
 public:
   ArcilatorSnitchModel() { name = "arcs"; }
 
   void vcd_start(const char *outputFile) override {
     vcd_stream.open(outputFile);
+    // model_vcd.reset(
+    //     new ValueChangeDump<snitch_thLayout>(model.vcd(vcd_stream)));
     model_vcd.reset(
-        new ValueChangeDump<snitch_thLayout>(model.vcd(vcd_stream)));
+        new ValueChangeDump<snitch_thLayout>(vcd_stream, &model.storage[0]));
+    model_vcd->writeHeader();
   }
 
   void vcd_dump(size_t cycle) override {
     if (model_vcd) {
-      model_vcd->time = cycle;
-      model_vcd->writeTimestep(0);
+      vcd_stream << "#" << cycle << "\n";
+      model_vcd->writeValues(is_first_vcd_dump);
+      is_first_vcd_dump = false;
     }
   }
 
