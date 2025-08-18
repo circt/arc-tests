@@ -1,8 +1,9 @@
+#include <cstdint>
+
 #include "elfio/elfio.hpp"
 #include "snitch-model.h"
 #include <cassert>
 #include <chrono>
-#include <cstdint>
 #include <functional>
 #include <iostream>
 #include <map>
@@ -35,15 +36,15 @@ public:
                          .count();
       std::cerr << model->name << ": " << (cycle / seconds) << " Hz\n";
       seconds = std::chrono::duration_cast<std::chrono::duration<double>>(
-                         model->clock_time)
-                         .count();
+                    model->clock_time)
+                    .count();
       std::cerr << model->name << ": time in clock eval " << seconds << " sec ("
                 << (cycle / seconds) << " Hz)\n";
       seconds = std::chrono::duration_cast<std::chrono::duration<double>>(
-                         model->passthrough_time)
-                         .count();
-      std::cerr << model->name << ": time in passthrough eval " << seconds <<
-                   " sec (" << (cycle / seconds) << " Hz)\n";
+                    model->passthrough_time)
+                    .count();
+      std::cerr << model->name << ": time in passthrough eval " << seconds
+                << " sec (" << (cycle / seconds) << " Hz)\n";
     }
   }
 
