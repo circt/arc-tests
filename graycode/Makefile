@@ -114,6 +114,7 @@ $(BUILD_MODEL)-circt.sv: $(BUILD_MODEL).mlir
 	$(BENCHMARK_PREFIX) $(FIRTOOL) --lowering-options=disallowLocalVariables $< -o $@ $(BENCHMARK_SUFFIX)
 
 $(BUILD_MODEL)-vtor-circt.a $(BUILD_MODEL)-vtor-circt.h: $(BUILD_MODEL)-circt.sv
+	echo "CIRCTVERILATOR: Current timestamp in milliseconds: ${shell date +%s%3N}" $(BENCHMARK_SUFFIX)
 	$(BENCHMARK_PREFIX) $(VERILATOR) -prefix VGraycodeCirct -O3 --noassert --x-assign fast --x-initial fast --threads 1 -sv -cc -Mdir $(BUILD_MODEL)-vtor-circt $^ -j 0 $(VERILATOR_ARGS) $(BENCHMARK_SUFFIX)
 	cd $(BUILD_MODEL)-vtor-circt/ && $(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) $(VERILATOR_CPP_FLAGS) -c -I/$(VERILATOR_ROOT)/include *.cpp $(BENCHMARK_SUFFIX)
 	cd $(BUILD_MODEL)-vtor-circt/ && $(BENCHMARK_PREFIX) $(AR) rcs $(BUILD_MODEL)-vtor-circt.a *.o $(BENCHMARK_SUFFIX)

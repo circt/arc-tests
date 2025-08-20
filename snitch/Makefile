@@ -109,6 +109,7 @@ $(BUILD_MODEL)-circt.sv: $(BUILD_MODEL).mlir
 	$(FIRTOOL) --lowering-options=disallowLocalVariables $< -o $@ $(BENCHMARK_SUFFIX)
 
 $(BUILD_MODEL)-vtor-circt.a $(BUILD_MODEL)-vtor-circt.h: $(BUILD_MODEL)-circt.sv $(REPO_ROOT)/EICG_wrapper.v
+	echo "CIRCTVERILATOR: Current timestamp in milliseconds: ${shell date +%s%3N}" $(BENCHMARK_SUFFIX)
 	$(VERILATOR) -O3 --noassert --x-assign fast --x-initial fast -top snitch_th -prefix VSnitchCirct -Idesign --threads 1 -sv -cc -Mdir $(BUILD_MODEL)-vtor-circt $^ -j 0 $(VERILATOR_ARGS) $(BENCHMARK_SUFFIX)
 	cd $(BUILD_MODEL)-vtor-circt/ && $(BENCHMARK_PREFIX) $(CXX) $(CXXFLAGS) $(VERILATOR_CPP_FLAGS) -c -I/$(VERILATOR_ROOT)/include *.cpp $(BENCHMARK_SUFFIX)
 	cd $(BUILD_MODEL)-vtor-circt/ && $(BENCHMARK_PREFIX) $(AR) rcs $(BUILD_MODEL)-vtor-circt.a *.o $(BENCHMARK_SUFFIX)
