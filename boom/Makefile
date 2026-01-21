@@ -11,7 +11,7 @@ $(shell mkdir -p $(BUILD_DIR))
 SOURCE_MODEL ?= boom
 BUILD_MODEL ?= $(BUILD_DIR)/boom
 
-ARCILATOR_ARGS ?= --mlir-timing --print-debug-info --mlir-pass-statistics
+ARCILATOR_ARGS ?= --mlir-timing --print-debug-info --mlir-pass-statistics --async-resets-as-sync
 VERILATOR_ARGS ?= -DPRINTF_COND=0 -DASSERT_VERBOSE_COND=0 -DSTOP_COND=0
 
 TRACE ?= 0
