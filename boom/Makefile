@@ -5,6 +5,12 @@ REPO_ROOT := ..
 BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone.riscv
 CONFIG ?= small
 
+ARCRUNTIME ?= 0
+ARCRUNTIME_INCLUDE_DIR   ?= $(ARCILATOR_UTILS_ROOT)/../../include
+ARCRUNTIME_CIRCT_LIB_DIR ?= $(ARCILATOR_UTILS_ROOT)/../lib
+ARCRUNTIME_LLVM_LIB_DIR  ?= $(dir $(shell which llc))/../lib
+ARCRUNTIME_LINK_LIBS     := -lCIRCTArcRuntime -lLLVMSupport -lLLVMDemangle
+
 BUILD_DIR ?= build/$(CONFIG)
 $(shell mkdir -p $(BUILD_DIR))
 
@@ -22,6 +28,14 @@ ifeq ($(TRACE),1)
 	CXXFLAGS += -DTRACE
 else
 	ARCILATOR_ARGS += --observe-wires=0 --observe-ports=0 --observe-named-values=0 --observe-registers=0 --observe-memories=0
+endif
+
+ifeq ($(ARCRUNTIME),1)
+    ARCRUNTIME_CXXFLAGS  = -DARC_USE_COMPILED_RUNTIME_LIB
+    ARCRUNTIME_CXXFLAGS += -I$(ARCRUNTIME_INCLUDE_DIR)
+    ARCRUNTIME_LD_FLAGS  = -L$(ARCRUNTIME_CIRCT_LIB_DIR)
+    ARCRUNTIME_LD_FLAGS += -L$(ARCRUNTIME_LLVM_LIB_DIR)
+    ARCRUNTIME_LD_FLAGS += $(ARCRUNTIME_LINK_LIBS)
 endif
 
 #===-------------------------------------------------------------------------===
@@ -63,13 +77,13 @@ $(BUILD_MODEL)-vtor.a $(BUILD_MODEL)-vtor.h &: $(BUILD_MODEL).sv $(REPO_ROOT)/ve
 #===-------------------------------------------------------------------------===
 
 $(BUILD_MODEL)-model-arc.o: $(SOURCE_MODEL)-model-arc.cpp $(SOURCE_MODEL)-model.h $(BUILD_MODEL)-arc.h
-	$(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -c $< -o $@
+	$(CXX) $(CXXFLAGS) $(ARCRUNTIME_CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -c $< -o $@
 
 $(BUILD_MODEL)-model-vtor.o: $(SOURCE_MODEL)-model-vtor.cpp $(SOURCE_MODEL)-model.h $(BUILD_MODEL)-vtor.h
 	$(CXX) $(CXXFLAGS) -I$(ARCILATOR_UTILS_ROOT)/ -I$(BUILD_DIR) -I/$(VERILATOR_ROOT)/include -c $< -o $@
 
 $(BUILD_MODEL)-main: $(SOURCE_MODEL)-main.cpp $(BUILD_MODEL)-model-arc.o $(BUILD_MODEL)-arc.o $(BUILD_MODEL)-model-vtor.o $(BUILD_MODEL)-vtor.a $(VERILATOR_ROOT)/include/verilated.cpp $(VERILATOR_ROOT)/include/verilated_vcd_c.cpp $(VERILATOR_ROOT)/include/verilated_threads.cpp
-	$(CXX) $(CXXFLAGS) -g -latomic -I$(REPO_ROOT)/elfio $^ -o $@
+	$(CXX) $(CXXFLAGS) $(ARCRUNTIME_CXXFLAGS) -g -latomic -I$(REPO_ROOT)/elfio $^ -o $@ $(ARCRUNTIME_LD_FLAGS)
 
 #===-------------------------------------------------------------------------===
 # Convenience

@@ -10,7 +10,11 @@ class ArcilatorRocketModel : public RocketModel {
   std::unique_ptr<ValueChangeDump<RocketSystemLayout>> model_vcd;
 
 public:
-  ArcilatorRocketModel() { name = "arcs"; }
+  ArcilatorRocketModel()
+#ifdef ARC_USE_COMPILED_RUNTIME_LIB
+    : model(RocketSystem("debug"))
+#endif
+    { name = "arcs"; }
 
   void vcd_start(const char *outputFile) override {
     vcd_stream.open(outputFile);
@@ -25,7 +29,7 @@ public:
     }
   }
 
-  void eval() override { RocketSystem_eval(&model.storage[0]); }
+  void eval() override { model.eval(); }
 
   Ports get_ports() override {
     return {
