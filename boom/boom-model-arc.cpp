@@ -10,7 +10,11 @@ class ArcilatorBoomModel : public BoomModel {
   std::unique_ptr<ValueChangeDump<BoomSystemLayout>> model_vcd;
 
 public:
-  ArcilatorBoomModel() { name = "arcs"; }
+  ArcilatorBoomModel()
+#ifdef ARC_USE_COMPILED_RUNTIME_LIB
+    : model(BoomSystem("debug"))
+#endif
+  { name = "arcs"; }
 
   void vcd_start(const char *outputFile) override {
     vcd_stream.open(outputFile);
@@ -25,7 +29,7 @@ public:
     }
   }
 
-  void eval() override { BoomSystem_eval(&model.storage[0]); }
+  void eval() override { model.eval(); }
 
   Ports get_ports() override {
     return {
