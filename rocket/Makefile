@@ -2,7 +2,7 @@ VERILATOR_ROOT ?= $(shell verilator -getenv VERILATOR_ROOT)
 mkfile_path := $(dir $(MAKEFILE_LIST))
 REPO_ROOT := ..
 ARCILATOR_UTILS_ROOT ?= $(dir $(shell which arcilator))
-BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone.riscv
+BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone_rv64gcv.riscv
 CONFIG ?= small-v1.6
 
 ARCRUNTIME ?= 0

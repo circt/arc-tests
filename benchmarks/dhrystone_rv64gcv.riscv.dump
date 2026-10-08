@@ -1,5 +1,5 @@
 
-dhrystone.riscv:     file format elf64-littleriscv
+dhrystone_rv64gcv.riscv:     file format elf64-littleriscv
 
 
 Disassembly of section .tohost:

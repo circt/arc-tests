@@ -2,7 +2,7 @@ CXXFLAGS = -O3 -Wall -std=c++17 -no-pie
 VERILATOR_ROOT ?= $(shell verilator -getenv VERILATOR_ROOT)
 ARCILATOR_UTILS_ROOT ?= $(dir $(shell which arcilator))
 REPO_ROOT := ..
-BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone.riscv
+BINARY ?= $(REPO_ROOT)/benchmarks/dhrystone_rv64gcv.riscv
 CONFIG ?= small
 
 ARCRUNTIME ?= 0

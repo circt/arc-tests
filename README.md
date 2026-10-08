@@ -53,7 +53,8 @@ The `benchmarks` directory contains a set of benchmarks already compiled to ELF 
 
 Available benchmarks:
 
-- `benchmarks/dhrystone/dhrystone.riscv`
+- `benchmarks/dhrystone/dhrystone_rv64gcv.riscv`
+- `benchmarks/dhrystone/dhrystone_rv32i.riscv`
 
 
 ## Debugging
