@@ -42,6 +42,18 @@ Pick one of the configs as follows:
 - `CONFIG=large`
 
 
+### Snitch
+
+The `snitch` directory contains the version of the [Snitch core](https://github.com/pulp-platform/snitch).
+
+Run Snitch benchmarks as follows:
+
+- `make -C snitch run`
+- `make -C snitch run-trace`
+- `make -C snitch run-arcs`
+- `make -C snitch run-vtor`
+
+
 ## Benchmarks
 
 The `benchmarks` directory contains a set of benchmarks already compiled to ELF files for easy performance measuring of Arcilator. The easiest way to run a benchmark is by setting `BINARY=<binary>` when calling `make run` for one of the designs. You can also pass the binary directly to one of the compile simulators.
