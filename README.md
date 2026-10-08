@@ -42,11 +42,6 @@ Pick one of the configs as follows:
 - `CONFIG=large`
 
 
-### Riscinator
-
-Run benchmarks with `make run MODEL=riscinator BINARY=<binary>`.
-
-
 ## Benchmarks
 
 The `benchmarks` directory contains a set of benchmarks already compiled to ELF files for easy performance measuring of Arcilator. The easiest way to run a benchmark is by setting `BINARY=<binary>` when calling `make run` for one of the designs. You can also pass the binary directly to one of the compile simulators.
