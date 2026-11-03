@@ -24,7 +24,7 @@ $(shell mkdir -p $(BUILD_DIR))
 SOURCE_MODEL ?= rocket
 BUILD_MODEL ?= $(BUILD_DIR)/rocket
 
-ARCILATOR_ARGS ?= --mlir-timing --print-debug-info --mlir-pass-statistics --async-resets-as-sync
+ARCILATOR_ARGS ?= --mlir-timing --print-debug-info --mlir-pass-statistics --async-resets-as-sync --no-generate-driver
 VERILATOR_ARGS ?= -DPRINTF_COND=0 -DASSERT_VERBOSE_COND=0 -DSTOP_COND=0
 
 TRACE ?= 0
